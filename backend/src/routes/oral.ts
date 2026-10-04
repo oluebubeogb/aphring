@@ -8,6 +8,7 @@ import { extractFactsFromText } from "../services/ai.js";
 import { createEmbedding, embeddingToSql } from "../services/embeddings.js";
 
 const router = Router();
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
@@ -43,13 +44,11 @@ router.post("/", upload.single("audio"), async (req: AuthRequest, res, next) => 
 
     const { originalname, mimetype, size, buffer } = req.file;
     const communityId = req.body.communityId as string | undefined;
-    // Optional client-side or external transcript
     let transcript = (req.body.transcript as string) || "";
 
     const objectName = `audio/${uuid()}-${originalname}`;
     await uploadFile(objectName, buffer, mimetype);
 
-    // Attempt STT if no transcript and Whisper key present
     if (!transcript && process.env.OPENAI_API_KEY) {
       try {
         transcript = await transcribeWithWhisper(buffer, originalname, mimetype);
@@ -133,13 +132,10 @@ async function transcribeWithWhisper(
   mimeType: string
 ): Promise<string> {
   const form = new FormData();
-
   const uint8 = new Uint8Array(buffer);
-
   const blob = new Blob([uint8], {
     type: mimeType,
   });
-
   form.append("file", blob, filename);
   form.append("model", "whisper-1");
 
@@ -159,7 +155,6 @@ async function transcribeWithWhisper(
   }
 
   const data = await response.json();
-
   return data.text ?? "";
 }
 

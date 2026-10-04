@@ -82,7 +82,6 @@ router.post("/:id/messages", async (req: AuthRequest, res, next) => {
     });
     if (!chat) return res.status(404).json({ error: "Chat not found" });
 
-    // Save user message
     await prisma.message.create({
       data: {
         chatId,
@@ -91,7 +90,6 @@ router.post("/:id/messages", async (req: AuthRequest, res, next) => {
       },
     });
 
-    // Update title if first message
     if (chat.title === "New Chat") {
       await prisma.chat.update({
         where: { id: chatId },
@@ -99,9 +97,11 @@ router.post("/:id/messages", async (req: AuthRequest, res, next) => {
       });
     }
 
-    // Retrieve + generate
     const sources = await retrieveContext(content);
-    const answer = await generateAnswer(content, sources);
+    const { answer, sources: usedSources } = await generateAnswer(
+      content,
+      sources
+    );
 
     const assistantMsg = await prisma.message.create({
       data: {
@@ -118,7 +118,11 @@ router.post("/:id/messages", async (req: AuthRequest, res, next) => {
 
     res.json({
       message: assistantMsg,
-      sources: sources.map((s) => ({ id: s.id, title: s.title, type: s.type })),
+      sources: usedSources.map((s) => ({
+        id: s.id,
+        title: s.title,
+        type: s.type,
+      })),
     });
   } catch (err) {
     next(err);
