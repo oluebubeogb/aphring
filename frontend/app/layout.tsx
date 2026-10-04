@@ -13,8 +13,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Prefer runtime env (Coolify can set this without rebuild)
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "";
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__APHRING_API_URL__=${JSON.stringify(apiUrl)};`,
+          }}
+        />
+      </head>
       <body className="min-h-screen antialiased">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

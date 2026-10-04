@@ -1,4 +1,14 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+function getApiUrl(): string {
+  if (typeof window !== "undefined") {
+    // Runtime override injected by layout (works with Coolify env without rebuild)
+    const runtime = (window as any).__APHRING_API_URL__;
+    if (runtime && typeof runtime === "string" && runtime.length > 0) {
+      return runtime.replace(/\/$/, "");
+    }
+  }
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL || "";
+  return fromEnv.replace(/\/$/, "") || "http://localhost:4000";
+}
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -22,7 +32,8 @@ export async function api<T = any>(
     (headers as any)["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const base = getApiUrl();
+  const res = await fetch(`${base}${path}`, {
     ...options,
     headers,
   });
