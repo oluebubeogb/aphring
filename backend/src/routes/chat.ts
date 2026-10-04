@@ -42,8 +42,9 @@ router.post("/", async (req: AuthRequest, res, next) => {
 
 router.get("/:id", async (req: AuthRequest, res, next) => {
   try {
+    const id = String(req.params.id);
     const chat = await prisma.chat.findFirst({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id, userId: req.user!.id },
       include: {
         messages: { orderBy: { createdAt: "asc" } },
       },
@@ -57,8 +58,9 @@ router.get("/:id", async (req: AuthRequest, res, next) => {
 
 router.delete("/:id", async (req: AuthRequest, res, next) => {
   try {
+    const id = String(req.params.id);
     await prisma.chat.deleteMany({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id, userId: req.user!.id },
     });
     res.json({ ok: true });
   } catch (err) {
@@ -73,7 +75,7 @@ const messageSchema = z.object({
 router.post("/:id/messages", async (req: AuthRequest, res, next) => {
   try {
     const { content } = messageSchema.parse(req.body);
-    const chatId = req.params.id;
+    const chatId = String(req.params.id);
 
     const chat = await prisma.chat.findFirst({
       where: { id: chatId, userId: req.user!.id },

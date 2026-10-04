@@ -46,8 +46,9 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const record = await prisma.knowledgeRecord.findUnique({
-      where: { id: req.params.id },
+      where: { id },
       include: {
         community: true,
         createdBy: { select: { id: true, name: true } },
@@ -119,8 +120,9 @@ router.patch(
         .object({ status: z.enum(["VERIFIED", "REJECTED", "PENDING"]) })
         .parse(req.body);
 
+      const id = String(req.params.id);
       const record = await prisma.knowledgeRecord.update({
-        where: { id: req.params.id },
+        where: { id },
         data: {
           status,
           verifiedById: status === "VERIFIED" ? req.user!.id : null,

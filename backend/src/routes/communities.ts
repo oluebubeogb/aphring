@@ -21,8 +21,9 @@ router.get("/", async (_req, res, next) => {
 
 router.get("/:slug", async (req, res, next) => {
   try {
+    const slug = String(req.params.slug);
     const community = await prisma.community.findUnique({
-      where: { slug: req.params.slug },
+      where: { slug },
       include: {
         knowledgeRecords: {
           where: { status: "VERIFIED" },
