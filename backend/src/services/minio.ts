@@ -1,40 +1,29 @@
-import * as Minio from "minio";
+import fs from "fs/promises";
+import path from "path";
 
-const endpoint = process.env.MINIO_ENDPOINT || "localhost";
-const port = parseInt(process.env.MINIO_PORT || "9000", 10);
-const useSSL = process.env.MINIO_USE_SSL === "true";
-
-export const minioClient = new Minio.Client({
-  endPoint: endpoint,
-  port,
-  useSSL,
-  accessKey: process.env.MINIO_ACCESS_KEY || "aphring",
-  secretKey: process.env.MINIO_SECRET_KEY || "aphring_minio_secret",
-});
-
-const BUCKET = process.env.MINIO_BUCKET || "aphring-documents";
+const STORAGE_PATH = process.env.STORAGE_PATH || "/app/uploads";
 
 export async function ensureBucket() {
-  const exists = await minioClient.bucketExists(BUCKET);
-  if (!exists) {
-    await minioClient.makeBucket(BUCKET, "us-east-1");
-    console.log(`Created MinIO bucket: ${BUCKET}`);
-  }
+  await fs.mkdir(STORAGE_PATH, { recursive: true });
+  await fs.mkdir(path.join(STORAGE_PATH, "documents"), { recursive: true });
+  console.log(`Storage ready at: ${STORAGE_PATH}`);
 }
 
 export async function uploadFile(
   objectName: string,
   buffer: Buffer,
-  mimeType: string
+  _mimeType: string
 ) {
-  await minioClient.putObject(BUCKET, objectName, buffer, buffer.length, {
-    "Content-Type": mimeType,
-  });
+  const fullPath = path.join(STORAGE_PATH, objectName);
+  await fs.mkdir(path.dirname(fullPath), { recursive: true });
+  await fs.writeFile(fullPath, buffer);
   return objectName;
 }
 
 export async function getFileStream(objectName: string) {
-  return minioClient.getObject(BUCKET, objectName);
+  const fullPath = path.join(STORAGE_PATH, objectName);
+  const { createReadStream } = await import("fs");
+  return createReadStream(fullPath);
 }
 
-export { BUCKET };
+export const BUCKET = "local";
