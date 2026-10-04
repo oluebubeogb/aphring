@@ -2,8 +2,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Internal Docker service name — not exposed to browser
+ARG BACKEND_URL=http://backend:4000
+ENV BACKEND_URL=$BACKEND_URL
 
 COPY package*.json ./
 RUN npm install
@@ -17,6 +18,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV BACKEND_URL=http://backend:4000
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
