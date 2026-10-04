@@ -133,24 +133,34 @@ async function transcribeWithWhisper(
   mimeType: string
 ): Promise<string> {
   const form = new FormData();
-  const blob = new Blob([buffer], { type: mimeType });
+
+  const uint8 = new Uint8Array(buffer);
+
+  const blob = new Blob([uint8], {
+    type: mimeType,
+  });
+
   form.append("file", blob, filename);
   form.append("model", "whisper-1");
 
-  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: form,
-  });
+  const response = await fetch(
+    "https://api.openai.com/v1/audio/transcriptions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: form,
+    }
+  );
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Whisper failed: ${t}`);
+  if (!response.ok) {
+    throw new Error(await response.text());
   }
-  const data = await res.json();
-  return data.text || "";
+
+  const data = await response.json();
+
+  return data.text ?? "";
 }
 
 export default router;
