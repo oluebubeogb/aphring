@@ -29,7 +29,7 @@ router.get("/", async (req, res, next) => {
         where,
         skip,
         take,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ sourceRank: "desc" }, { createdAt: "desc" }],
         include: {
           community: { select: { id: true, name: true, slug: true } },
           createdBy: { select: { id: true, name: true } },

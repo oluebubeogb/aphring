@@ -82,6 +82,7 @@ export default function LandingPage() {
               { icon: Users, label: "Explore Communities", href: "/explore" },
               { icon: Upload, label: "Contribute Knowledge", href: "/submit" },
               { icon: Archive, label: "Browse Archives", href: "/explore" },
+              { icon: Upload, label: "Oral History", href: "/oral" },
             ].map(({ icon: Icon, label, href }) => (
               <Link
                 key={label}

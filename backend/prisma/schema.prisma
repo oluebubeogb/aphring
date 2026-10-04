@@ -48,6 +48,17 @@ enum MessageRole {
   SYSTEM
 }
 
+enum VoteType {
+  UP
+  DOWN
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -55,6 +66,7 @@ model User {
   password  String
   avatar    String?
   role      Role     @default(USER)
+  reputation Int     @default(0)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -62,49 +74,89 @@ model User {
   verifiedRecords  KnowledgeRecord[] @relation("VerifiedBy")
   documents        Document[]
   chats            Chat[]
+  votes            Vote[]
+  reports          Report[]
+  audioUploads     AudioUpload[]
 
   @@map("users")
 }
 
 model Community {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  lga       String?
-  state     String   @default("Abia")
-  country   String   @default("Nigeria")
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  lga         String?
+  ward        String?
+  state       String   @default("Abia")
+  country     String   @default("Nigeria")
   description String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   knowledgeRecords KnowledgeRecord[]
 
+  @@index([state])
+  @@index([lga])
   @@map("communities")
 }
 
 model KnowledgeRecord {
-  id          String          @id @default(cuid())
-  title       String
-  content     String
-  type        KnowledgeType
-  status      KnowledgeStatus @default(DRAFT)
-  embedding   Unsupported("vector(1536)")?
-  createdById String          @map("created_by")
-  verifiedById String?        @map("verified_by")
-  communityId String?         @map("community_id")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  id           String          @id @default(cuid())
+  title        String
+  content      String
+  type         KnowledgeType
+  status       KnowledgeStatus @default(DRAFT)
+  embedding    Unsupported("vector(1536)")?
+  sourceRank   Float           @default(0) @map("source_rank")
+  upvotes      Int             @default(0)
+  downvotes    Int             @default(0)
+  createdById  String          @map("created_by")
+  verifiedById String?         @map("verified_by")
+  communityId  String?         @map("community_id")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
 
-  createdBy  User       @relation("CreatedBy", fields: [createdById], references: [id])
-  verifiedBy User?      @relation("VerifiedBy", fields: [verifiedById], references: [id])
-  community  Community? @relation(fields: [communityId], references: [id])
+  createdBy  User              @relation("CreatedBy", fields: [createdById], references: [id])
+  verifiedBy User?             @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  community  Community?        @relation(fields: [communityId], references: [id])
   citations  Citation[]
   entities   KnowledgeEntity[]
+  votes      Vote[]
+  reports    Report[]
 
   @@index([status])
   @@index([type])
   @@index([communityId])
+  @@index([sourceRank])
   @@map("knowledge_records")
+}
+
+model Vote {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  knowledgeRecordId String   @map("knowledge_record_id")
+  type              VoteType
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, knowledgeRecordId])
+  @@map("votes")
+}
+
+model Report {
+  id                String       @id @default(cuid())
+  userId            String       @map("user_id")
+  knowledgeRecordId String       @map("knowledge_record_id")
+  reason            String
+  status            ReportStatus @default(OPEN)
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
 }
 
 model Entity {
@@ -134,13 +186,13 @@ model KnowledgeEntity {
 }
 
 model Document {
-  id         String   @id @default(cuid())
-  filename   String
-  path       String
-  mimeType   String   @map("mime_type")
-  size       Int
-  uploadedById String @map("uploaded_by")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  filename     String
+  path         String
+  mimeType     String   @map("mime_type")
+  size         Int
+  uploadedById String   @map("uploaded_by")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   uploadedBy User       @relation(fields: [uploadedById], references: [id])
   citations  Citation[]
@@ -186,4 +238,22 @@ model Message {
 
   @@index([chatId])
   @@map("messages")
+}
+
+model AudioUpload {
+  id           String   @id @default(cuid())
+  filename     String
+  path         String
+  mimeType     String   @map("mime_type")
+  size         Int
+  durationSec  Int?     @map("duration_sec")
+  transcript   String?
+  status       String   @default("PENDING") // PENDING | TRANSCRIBED | EXTRACTED | FAILED
+  uploadedById String   @map("uploaded_by")
+  communityId  String?  @map("community_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@map("audio_uploads")
 }

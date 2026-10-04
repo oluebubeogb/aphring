@@ -11,6 +11,9 @@ interface Stats {
   pending: number;
   verified: number;
   communities: number;
+  reports: number;
+  audio: number;
+  votes: number;
 }
 
 interface PendingRecord {
@@ -18,14 +21,30 @@ interface PendingRecord {
   title: string;
   content: string;
   type: string;
-  createdBy: { name: string; email: string };
+  upvotes: number;
+  downvotes: number;
+  sourceRank: number;
+  createdBy: { name: string; email: string; reputation: number };
   community: { name: string } | null;
 }
+
+interface Doc {
+  id: string;
+  filename: string;
+  size: number;
+  createdAt: string;
+  uploadedBy: { name: string; email: string };
+  _count: { citations: number };
+}
+
+type Tab = "pending" | "documents" | "users";
 
 export default function AdminPage() {
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [pending, setPending] = useState<PendingRecord[]>([]);
+  const [docs, setDocs] = useState<Doc[]>([]);
+  const [tab, setTab] = useState<Tab>("pending");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,17 +52,25 @@ export default function AdminPage() {
       router.push("/login");
       return;
     }
-    Promise.all([
-      api<Stats>("/api/admin/stats"),
-      api<PendingRecord[]>("/api/admin/pending"),
-    ])
-      .then(([s, p]) => {
-        setStats(s);
-        setPending(p);
-      })
-      .catch(() => router.push("/"))
-      .finally(() => setLoading(false));
+    load();
   }, []);
+
+  async function load() {
+    try {
+      const [s, p, d] = await Promise.all([
+        api<Stats>("/api/admin/stats"),
+        api<PendingRecord[]>("/api/admin/pending"),
+        api<Doc[]>("/api/admin/documents"),
+      ]);
+      setStats(s);
+      setPending(p);
+      setDocs(d);
+    } catch {
+      router.push("/");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function updateStatus(id: string, status: "VERIFIED" | "REJECTED") {
     await api(`/api/knowledge/${id}/status`, {
@@ -75,22 +102,27 @@ export default function AdminPage() {
           <Link href="/" className="font-semibold tracking-tight">
             aphring
           </Link>
-          <span className="text-sm text-secondary">Verification Dashboard</span>
+          <span className="text-sm text-secondary">Admin · Phase 2</span>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-12">
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-12">
-            {[
-              ["Users", stats.users],
-              ["Documents", stats.documents],
-              ["Pending", stats.pending],
-              ["Verified", stats.verified],
-              ["Communities", stats.communities],
-            ].map(([label, value]) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
+            {(
+              [
+                ["Users", stats.users],
+                ["Documents", stats.documents],
+                ["Pending", stats.pending],
+                ["Verified", stats.verified],
+                ["Communities", stats.communities],
+                ["Reports", stats.reports],
+                ["Audio", stats.audio],
+                ["Votes", stats.votes],
+              ] as const
+            ).map(([label, value]) => (
               <div
-                key={label as string}
+                key={label}
                 className="p-4 rounded-xl border border-border bg-surface text-center"
               >
                 <p className="text-2xl font-semibold">{value}</p>
@@ -100,48 +132,104 @@ export default function AdminPage() {
           </div>
         )}
 
-        <h2 className="text-lg font-medium mb-4">
-          Pending Verification ({pending.length})
-        </h2>
+        <div className="flex gap-2 mb-6 border-b border-border pb-2">
+          {(
+            [
+              ["pending", "Pending"],
+              ["documents", "Uploaded files"],
+              ["users", "Overview"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                tab === key
+                  ? "bg-accent text-background"
+                  : "text-secondary hover:text-primary"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-        {pending.length === 0 ? (
-          <p className="text-secondary text-sm">No pending records.</p>
-        ) : (
+        {tab === "pending" && (
           <div className="space-y-4">
-            {pending.map((r) => (
-              <div
-                key={r.id}
-                className="p-5 rounded-xl border border-border bg-surface"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs uppercase tracking-wide text-secondary bg-background px-2 py-0.5 rounded">
-                    {r.type}
-                  </span>
-                  <span className="text-xs text-secondary">
-                    by {r.createdBy.name}
-                  </span>
+            {pending.length === 0 ? (
+              <p className="text-secondary text-sm">No pending records.</p>
+            ) : (
+              pending.map((r) => (
+                <div
+                  key={r.id}
+                  className="p-5 rounded-xl border border-border bg-surface"
+                >
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="text-xs uppercase tracking-wide text-secondary bg-background px-2 py-0.5 rounded">
+                      {r.type}
+                    </span>
+                    <span className="text-xs text-secondary">
+                      by {r.createdBy.name} · rep {r.createdBy.reputation}
+                    </span>
+                    {(r.upvotes > 0 || r.downvotes > 0) && (
+                      <span className="text-xs text-secondary">
+                        ↑{r.upvotes} ↓{r.downvotes} · rank {r.sourceRank}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-medium">{r.title}</h3>
+                  <p className="mt-2 text-sm text-secondary leading-relaxed line-clamp-3">
+                    {r.content}
+                  </p>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => updateStatus(r.id, "VERIFIED")}
+                      className="px-3 py-1.5 rounded-lg bg-accent text-background text-sm font-medium"
+                    >
+                      Verify
+                    </button>
+                    <button
+                      onClick={() => updateStatus(r.id, "REJECTED")}
+                      className="px-3 py-1.5 rounded-lg border border-border text-sm text-secondary hover:text-primary"
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
-                <h3 className="font-medium">{r.title}</h3>
-                <p className="mt-2 text-sm text-secondary leading-relaxed line-clamp-3">
-                  {r.content}
-                </p>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => updateStatus(r.id, "VERIFIED")}
-                    className="px-3 py-1.5 rounded-lg bg-accent text-background text-sm font-medium"
-                  >
-                    Verify
-                  </button>
-                  <button
-                    onClick={() => updateStatus(r.id, "REJECTED")}
-                    className="px-3 py-1.5 rounded-lg border border-border text-sm text-secondary hover:text-primary"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
+        )}
+
+        {tab === "documents" && (
+          <div className="space-y-2">
+            {docs.length === 0 ? (
+              <p className="text-secondary text-sm">No documents uploaded yet.</p>
+            ) : (
+              docs.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between p-4 rounded-xl border border-border bg-surface text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-primary">{d.filename}</p>
+                    <p className="text-xs text-secondary mt-0.5">
+                      {d.uploadedBy.name} · {(d.size / 1024).toFixed(1)} KB ·{" "}
+                      {d._count.citations} citations ·{" "}
+                      {new Date(d.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {tab === "users" && stats && (
+          <p className="text-secondary text-sm">
+            {stats.users} users · {stats.communities} communities ·{" "}
+            {stats.verified} verified records · {stats.votes} community votes
+          </p>
         )}
       </main>
     </div>
