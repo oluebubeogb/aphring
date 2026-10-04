@@ -24,7 +24,6 @@ export async function retrieveContext(
   const embedding = await createEmbedding(query);
   const vector = embeddingToSql(embedding);
 
-  // Raw query for pgvector cosine similarity
   const results = await prisma.$queryRawUnsafe<
     Array<{
       id: string;
@@ -54,6 +53,26 @@ export async function retrieveContext(
   }));
 }
 
+function extractAnswer(data: any): string {
+  // Runpod Granite public endpoint format
+  if (data?.output?.choices?.[0]?.tokens) {
+    const tokens = data.output.choices[0].tokens;
+    return Array.isArray(tokens) ? tokens.join("") : String(tokens);
+  }
+  // OpenAI-style
+  if (data?.output?.choices?.[0]?.message?.content) {
+    return data.output.choices[0].message.content;
+  }
+  if (data?.output?.text) return data.output.text;
+  if (typeof data?.output === "string") return data.output;
+  if (data?.choices?.[0]?.message?.content) {
+    return data.choices[0].message.content;
+  }
+  return typeof data?.output !== "undefined"
+    ? JSON.stringify(data.output)
+    : "Unable to generate answer.";
+}
+
 export async function generateAnswer(
   question: string,
   sources: RetrievedSource[]
@@ -76,22 +95,31 @@ export async function generateAnswer(
     },
   ];
 
-  const endpointId = process.env.RUNPOD_ENDPOINT_ID;
+  let endpointId = (process.env.RUNPOD_ENDPOINT_ID || "").trim();
   const apiKey = process.env.RUNPOD_API_KEY;
 
+  // Allow full URL or bare id
+  if (endpointId.includes("api.runpod.ai")) {
+    const match = endpointId.match(/\/v2\/([^/]+)/);
+    if (match) endpointId = match[1];
+  }
+  // Strip trailing /runsync if present
+  endpointId = endpointId.replace(/\/runsync\/?$/, "").replace(/\/$/, "");
+
   if (!endpointId || !apiKey) {
-    // Dev fallback
     if (sources.length === 0) {
       return "The Aphring knowledge base currently contains no verified information about this topic.";
     }
     return (
       `Based on verified Aphring sources:\n\n` +
-      sources.map((s, i) => `${i + 1}. ${s.title}: ${s.content.slice(0, 300)}...`).join("\n\n") +
+      sources
+        .map((s, i) => `${i + 1}. ${s.title}: ${s.content.slice(0, 300)}...`)
+        .join("\n\n") +
       `\n\n(Sources: ${sources.map((s) => s.id).join(", ")})`
     );
   }
 
-  // Runpod serverless endpoint call
+  // Runpod public Granite format
   const res = await fetch(
     `https://api.runpod.ai/v2/${endpointId}/runsync`,
     {
@@ -103,8 +131,13 @@ export async function generateAnswer(
       body: JSON.stringify({
         input: {
           messages,
-          max_tokens: 1024,
-          temperature: 0.2,
+          sampling_params: {
+            max_tokens: 1024,
+            temperature: 0.2,
+            top_p: 1,
+            top_k: -1,
+            seed: -1,
+          },
         },
       }),
     }
@@ -112,21 +145,14 @@ export async function generateAnswer(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Runpod error: ${err}`);
+    throw new Error(`Runpod error: ${res.status} ${err}`);
   }
 
   const data = await res.json();
-  const answer =
-    data.output?.choices?.[0]?.message?.content ||
-    data.output?.text ||
-    data.output ||
-    "Unable to generate answer.";
+  const answer = extractAnswer(data);
 
-  // Append citations
   if (sources.length > 0) {
-    const cites = sources
-      .map((s, i) => `[${i + 1}] ${s.title}`)
-      .join(" · ");
+    const cites = sources.map((s, i) => `[${i + 1}] ${s.title}`).join(" · ");
     return `${answer}\n\n---\nSources: ${cites}`;
   }
 
@@ -135,16 +161,14 @@ export async function generateAnswer(
 
 export async function extractFactsFromText(
   text: string,
-  uploadedById: string
+  _uploadedById: string
 ): Promise<{ title: string; content: string; type: string }[]> {
-  // Simple heuristic extraction for Phase 1.
-  // Phase 2 can replace with full LLM extraction.
   const paragraphs = text
     .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter((p) => p.length > 80);
 
-  const facts = paragraphs.slice(0, 10).map((p, i) => {
+  return paragraphs.slice(0, 10).map((p, i) => {
     const firstLine = p.split("\n")[0].slice(0, 120);
     return {
       title: firstLine || `Extracted fact ${i + 1}`,
@@ -152,6 +176,4 @@ export async function extractFactsFromText(
       type: "history",
     };
   });
-
-  return facts;
 }
