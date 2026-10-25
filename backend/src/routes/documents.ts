@@ -1,111 +1,130 @@
 import { Router } from "express";
 import multer from "multer";
-import { v4 as uuid } from "uuid";
-import pdf from "pdf-parse";
+import { z } from "zod";
 import { prisma } from "../services/prisma.js";
-import { requireAuth, AuthRequest } from "../middleware/auth.js";
-import { uploadFile } from "../services/minio.js";
-import { extractFactsFromText } from "../services/ai.js";
-import { createEmbedding, embeddingToSql } from "../services/embeddings.js";
+import { requireAuth, optionalAuth, AuthRequest, isStaff } from "../middleware/auth.js";
+import { makeObjectName, saveFile, getFileStream } from "../services/storage.js";
+import { detectDocument, extractDocumentText, splitIntoRecords } from "../services/text.js";
+import { KNOWLEDGE_TYPES } from "./knowledge.js";
 
 const router = Router();
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-  fileFilter: (_req, file, cb) => {
-    const allowed = [
-      "application/pdf",
-      "text/plain",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Only PDF, TXT, DOC, DOCX allowed"));
-  },
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
+
+const bodySchema = z.object({
+  type: z.enum(KNOWLEDGE_TYPES).default("history"),
+  placeText: z.string().trim().max(200).optional(),
 });
 
-router.use(requireAuth);
-
-router.post("/", upload.single("file"), async (req: AuthRequest, res, next) => {
+/**
+ * Upload → validate by magic bytes → extract → split into PENDING draft records.
+ * No AI call and no embedding here: records are embedded when verified.
+ */
+router.post("/", requireAuth, upload.single("file"), async (req: AuthRequest, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const body = bodySchema.parse(req.body);
+    const { originalname, size, buffer } = req.file;
+    const { kind, mime } = detectDocument(originalname, buffer);
 
-    const { originalname, mimetype, size, buffer } = req.file;
-    const objectName = `documents/${uuid()}-${originalname}`;
+    const raw = await extractDocumentText(kind, buffer);
+    const drafts = splitIntoRecords(raw);
+    if (drafts.length === 0) {
+      return res.status(400).json({ error: "No readable text found. Scanned PDFs need OCR before upload." });
+    }
 
-    await uploadFile(objectName, buffer, mimetype);
+    const objectName = makeObjectName("documents", originalname);
+    await saveFile(objectName, buffer);
 
-    const doc = await prisma.document.create({
-      data: {
-        filename: originalname,
-        path: objectName,
-        mimeType: mimetype,
-        size,
-        uploadedById: req.user!.id,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const document = await tx.document.create({
+        data: {
+          filename: originalname.slice(0, 200),
+          path: objectName,
+          mimeType: mime,
+          size,
+          placeText: body.placeText || null,
+          uploadedById: req.user!.id,
+        },
+      });
+      const records = [];
+      for (const [i, d] of drafts.entries()) {
+        const record = await tx.knowledgeRecord.create({
+          data: {
+            title: d.title,
+            content: d.content,
+            type: body.type,
+            placeText: body.placeText || null,
+            status: "PENDING",
+            createdById: req.user!.id,
+            citations: { create: { documentId: document.id, paragraph: `Part ${i + 1} of ${drafts.length}` } },
+          },
+          select: { id: true, title: true, status: true },
+        });
+        records.push(record);
+      }
+      return { document, records };
     });
 
-    // Extract text
-    let text = "";
-    if (mimetype === "application/pdf") {
-      const data = await pdf(buffer);
-      text = data.text;
-    } else if (mimetype === "text/plain") {
-      text = buffer.toString("utf-8");
-    } else {
-      // DOCX basic: treat as text for Phase 1 (improve later)
-      text = buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ");
-    }
-
-    // Extract draft knowledge records
-    const facts = await extractFactsFromText(text, req.user!.id);
-    const createdRecords = [];
-
-    for (const fact of facts) {
-      const embedding = await createEmbedding(`${fact.title}\n${fact.content}`);
-      const record = await prisma.knowledgeRecord.create({
-        data: {
-          title: fact.title,
-          content: fact.content,
-          type: fact.type as any,
-          status: "PENDING",
-          createdById: req.user!.id,
-        },
-      });
-
-      await prisma.$executeRawUnsafe(
-        `UPDATE knowledge_records SET embedding = $1::vector WHERE id = $2`,
-        embeddingToSql(embedding),
-        record.id
-      );
-
-      await prisma.citation.create({
-        data: {
-          knowledgeRecordId: record.id,
-          documentId: doc.id,
-        },
-      });
-
-      createdRecords.push(record);
-    }
-
     res.status(201).json({
-      document: doc,
-      extracted: createdRecords.length,
-      records: createdRecords,
+      document: {
+        id: result.document.id,
+        filename: result.document.filename,
+        mimeType: result.document.mimeType,
+        size: result.document.size,
+      },
+      recordsCreated: result.records.length,
+      records: result.records,
+      message: `Created ${result.records.length} draft record(s). They will appear publicly once a moderator verifies them.`,
     });
   } catch (err) {
     next(err);
   }
 });
 
-router.get("/", async (req: AuthRequest, res, next) => {
+/** Your uploads. */
+router.get("/", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const docs = await prisma.document.findMany({
       where: { uploadedById: req.user!.id },
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        filename: true,
+        mimeType: true,
+        size: true,
+        placeText: true,
+        createdAt: true,
+        _count: { select: { citations: true } },
+      },
     });
     res.json(docs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Download the original file. Public only when the document backs at least one
+ * VERIFIED record; otherwise uploader or staff.
+ */
+router.get("/:id/download", optionalAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const doc = await prisma.document.findUnique({
+      where: { id: String(req.params.id) },
+      include: { _count: { select: { citations: { where: { knowledgeRecord: { status: "VERIFIED" } } } } } },
+    });
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    const allowed = doc._count.citations > 0 || isStaff(req.user) || req.user?.id === doc.uploadedById;
+    if (!allowed) return res.status(404).json({ error: "Document not found" });
+    res.setHeader("Content-Type", doc.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${doc.filename.replace(/[^\w.\- ]/g, "_")}"`);
+    const stream = getFileStream(doc.path);
+    stream.on("error", () => {
+      if (!res.headersSent) res.status(404).json({ error: "File missing from storage" });
+      else res.end();
+    });
+    stream.pipe(res);
   } catch (err) {
     next(err);
   }

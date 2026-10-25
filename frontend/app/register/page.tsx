@@ -3,27 +3,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, setToken } from "@/lib/api";
+import { api, setSession, type SessionUser } from "@/lib/api";
+import { btnPrimary, inputCls, Notice } from "@/components/ui";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({ name: "", username: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await api<{ token: string }>("/api/auth/register", {
+      const res = await api<{ token: string; user: SessionUser }>("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ ...form, username: form.username.toLowerCase() }),
       });
-      setToken(res.token);
-      router.push("/chat");
+      setSession(res.token, res.user);
+      router.push("/explore");
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -38,58 +38,41 @@ export default function RegisterPage() {
           <Link href="/" className="text-2xl font-semibold tracking-tight">
             aphring
           </Link>
-          <p className="mt-2 text-secondary text-sm">Create your account</p>
+          <p className="mt-2 text-secondary text-sm">Create your contributor account</p>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded-lg">
-              {error}
-            </p>
-          )}
+          {error && <Notice kind="error">{error}</Notice>}
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Name</label>
+            <label className="block text-sm text-secondary mb-1.5">Full name</label>
+            <input value={form.name} onChange={set("name")} required minLength={2} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-sm text-secondary mb-1.5">Username</label>
             <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={form.username}
+              onChange={set("username")}
               required
-              minLength={2}
-              className="w-full h-11 px-3 rounded-lg border border-border bg-surface text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
+              pattern="[A-Za-z0-9_]{3,30}"
+              title="3–30 letters, numbers or underscores"
+              autoComplete="username"
+              className={inputCls}
             />
+            <p className="text-xs text-secondary mt-1">Shown publicly on your records and the leaderboard. 3–30 letters, numbers or _.</p>
           </div>
           <div>
             <label className="block text-sm text-secondary mb-1.5">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full h-11 px-3 rounded-lg border border-border bg-surface text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-            />
+            <input type="email" value={form.email} onChange={set("email")} required className={inputCls} />
           </div>
           <div>
             <label className="block text-sm text-secondary mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full h-11 px-3 rounded-lg border border-border bg-surface text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-            />
+            <input type="password" value={form.password} onChange={set("password")} required minLength={8} autoComplete="new-password" className={inputCls} />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-11 rounded-lg bg-accent text-background font-medium hover:opacity-90 disabled:opacity-50 transition"
-          >
+          <button type="submit" disabled={loading} className={`${btnPrimary} w-full h-11`}>
             {loading ? "Creating…" : "Create account"}
           </button>
         </form>
-
         <p className="text-center text-sm text-secondary">
-          Already have an account?{" "}
+          Have an account?{" "}
           <Link href="/login" className="text-primary underline underline-offset-2">
             Sign in
           </Link>

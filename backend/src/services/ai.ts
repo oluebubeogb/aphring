@@ -1,5 +1,6 @@
 import { prisma } from "./prisma.js";
-import { createEmbedding, embeddingToSql } from "./embeddings.js";
+import { createEmbedding, embeddingToSql, embeddingsEnabled } from "./embeddings.js";
+import { singleLine } from "./text.js";
 
 const SYSTEM_PROMPT = `You are Aphring AI — a helpful assistant for Nigeria's community knowledge network.
 
@@ -12,7 +13,7 @@ The Aphring knowledge base currently contains no verified information about this
 5. When you do answer from context, do not invent source labels in the body — the system will attach sources separately only when relevant.
 6. Strip any odd characters from source text (control characters, excessive backslashes) and rephrase into readable prose.`;
 
-interface RetrievedSource {
+export interface RetrievedSource {
   id: string;
   title: string;
   content: string;
@@ -20,221 +21,141 @@ interface RetrievedSource {
   distance?: number;
 }
 
-const NO_INFO =
+export const NO_INFO =
   "The Aphring knowledge base currently contains no verified information about this topic.";
 
 /** Distance threshold: higher = less similar. Only keep tight matches. */
 const MAX_DISTANCE = 0.55;
+/** Cost control: cap the context sent to the model. */
+const MAX_CONTEXT_CHARS = 6000;
 
-export async function retrieveContext(
-  query: string,
-  limit = 5
-): Promise<RetrievedSource[]> {
-  const embedding = await createEmbedding(query);
-  const vector = embeddingToSql(embedding);
-
-  const results = await prisma.$queryRawUnsafe<
-    Array<{
-      id: string;
-      title: string;
-      content: string;
-      type: string;
-      distance: number;
-    }>
-  >(
-    `
-    SELECT id, title, content, type,
-           embedding <=> $1::vector AS distance
-    FROM knowledge_records
-    WHERE status = 'VERIFIED' AND embedding IS NOT NULL
-    ORDER BY distance ASC
-    LIMIT $2
-    `,
-    vector,
-    limit
-  );
-
-  // Only return sources that are actually similar to the question
-  return results
-    .filter((r) => Number(r.distance) <= MAX_DISTANCE)
-    .map((r) => ({
-      id: r.id,
-      title: cleanText(r.title),
-      content: cleanText(r.content),
-      type: r.type,
-      distance: Number(r.distance),
-    }));
+export async function retrieveContext(query: string, limit = 5): Promise<RetrievedSource[]> {
+  let results: RetrievedSource[] = [];
+  if (embeddingsEnabled()) {
+    try {
+      const vector = embeddingToSql(await createEmbedding(query));
+      const rows = await prisma.$queryRawUnsafe<
+        Array<{ id: string; title: string; content: string; type: string; distance: number }>
+      >(
+        `SELECT id, title, content, type::text AS type, embedding <=> $1::vector AS distance
+         FROM knowledge_records
+         WHERE status = 'VERIFIED' AND embedding IS NOT NULL
+         ORDER BY distance ASC
+         LIMIT $2`,
+        vector,
+        limit
+      );
+      results = rows
+        .filter((r) => Number(r.distance) <= MAX_DISTANCE)
+        .map((r) => ({ ...r, distance: Number(r.distance) }));
+    } catch (err) {
+      console.error("[ai] vector retrieval failed, falling back to keyword:", (err as Error).message);
+    }
+  }
+  if (results.length === 0) results = await keywordRetrieve(query, limit);
+  return results.map((r) => ({ ...r, title: singleLine(r.title), content: singleLine(r.content) }));
 }
 
-function cleanText(s: string): string {
-  return s
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, " ")
-    .replace(/\\"/g, '"')
-    .replace(/\\'/g, "'")
-    .replace(/\\\\/g, "\\")
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+/** Postgres full-text fallback. Free, no embeddings needed. */
+async function keywordRetrieve(query: string, limit: number): Promise<RetrievedSource[]> {
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ id: string; title: string; content: string; type: string; rank: number }>
+  >(
+    `SELECT id, title, content, type::text AS type,
+            ts_rank(to_tsvector('english', title || ' ' || content), plainto_tsquery('english', $1)) AS rank
+     FROM knowledge_records
+     WHERE status = 'VERIFIED'
+       AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', $1)
+     ORDER BY rank DESC
+     LIMIT $2`,
+    query,
+    limit
+  );
+  return rows.filter((r) => Number(r.rank) > 0.01);
 }
 
 function extractAnswer(data: any): string {
   let raw = "";
-
-  if (data?.output?.choices?.[0]?.tokens) {
-    const tokens = data.output.choices[0].tokens;
+  const o = data?.output;
+  if (o?.choices?.[0]?.tokens) {
+    const tokens = o.choices[0].tokens;
     raw = Array.isArray(tokens) ? tokens.join("") : String(tokens);
-  } else if (data?.output?.choices?.[0]?.message?.content) {
-    raw = data.output.choices[0].message.content;
-  } else if (data?.output?.text) {
-    raw = data.output.text;
-  } else if (typeof data?.output === "string") {
-    raw = data.output;
-  } else if (data?.choices?.[0]?.message?.content) {
-    raw = data.choices[0].message.content;
-  } else if (data?.output != null) {
-    // Avoid dumping raw JSON to the user
-    if (typeof data.output === "object") {
-      const o = data.output;
-      raw =
-        o.text ||
-        o.response ||
-        o.generated_text ||
-        o.choices?.[0]?.tokens?.join?.("") ||
-        o.choices?.[0]?.message?.content ||
-        "";
-    }
-  }
-
-  if (!raw || !String(raw).trim()) {
-    return NO_INFO;
-  }
-
+  } else if (o?.choices?.[0]?.message?.content) raw = o.choices[0].message.content;
+  else if (o?.text) raw = o.text;
+  else if (typeof o === "string") raw = o;
+  else if (data?.choices?.[0]?.message?.content) raw = data.choices[0].message.content;
+  else if (o && typeof o === "object") raw = o.response || o.generated_text || "";
+  if (Array.isArray(o) && o[0]?.choices?.[0]?.tokens) raw = o[0].choices[0].tokens.join("");
+  if (!raw || !String(raw).trim()) return NO_INFO;
   return humanizeAnswer(String(raw));
 }
 
 function humanizeAnswer(text: string): string {
-  let t = text.trim();
-
-  // Strip code fences / JSON wrappers if model leaked them
-  t = t.replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/i, "");
-  t = t.replace(/^\{[\s\S]*"content"\s*:\s*"/, "").replace(/"\s*\}\s*$/, "");
-
-  t = cleanText(t);
-
-  // Unescape leftover sequences
-  t = t
+  return text
+    .trim()
+    .replace(/^```(?:json|text)?\s*/i, "")
+    .replace(/\s*```$/i, "")
     .replace(/\\n/g, "\n")
+    .replace(/\\t/g, " ")
+    .replace(/\\"/g, '"')
     .replace(/\\r/g, "")
-    .replace(/\n{3,}/g, "\n\n");
-
-  return t.trim();
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export async function generateAnswer(
   question: string,
   sources: RetrievedSource[]
 ): Promise<{ answer: string; sources: RetrievedSource[] }> {
-  // No relevant sources → fixed message, empty sources list
-  if (sources.length === 0) {
-    return { answer: NO_INFO, sources: [] };
+  // No relevant sources → fixed message, no model call (cost control).
+  if (sources.length === 0) return { answer: NO_INFO, sources: [] };
+
+  let budget = MAX_CONTEXT_CHARS;
+  const parts: string[] = [];
+  for (const [i, s] of sources.entries()) {
+    const body = s.content.slice(0, Math.max(0, budget));
+    if (!body) break;
+    parts.push(`Source ${i + 1} (${s.type}): ${s.title}\n${body}`);
+    budget -= body.length;
   }
-
-  const context = sources
-    .map(
-      (s, i) =>
-        `Source ${i + 1} (${s.type}): ${s.title}\n${s.content}`
-    )
-    .join("\n\n");
-
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: `Context from the Aphring knowledge base:\n\n${context}\n\nQuestion: ${question}\n\nWrite a clear answer for a general reader. Use only the context above.`,
+      content: `Context from the Aphring knowledge base:\n\n${parts.join("\n\n")}\n\nQuestion: ${question}\n\nWrite a clear answer for a general reader. Use only the context above.`,
     },
   ];
 
   let endpointId = (process.env.RUNPOD_ENDPOINT_ID || "").trim();
   const apiKey = process.env.RUNPOD_API_KEY;
-
-  if (endpointId.includes("api.runpod.ai")) {
-    const match = endpointId.match(/\/v2\/([^/]+)/);
-    if (match) endpointId = match[1];
-  }
+  const m = endpointId.match(/\/v2\/([^/]+)/);
+  if (m) endpointId = m[1];
   endpointId = endpointId.replace(/\/runsync\/?$/, "").replace(/\/$/, "");
 
-  // Dev / no keys fallback
+  // No model configured: return verified excerpts directly (zero cost).
   if (!endpointId || !apiKey) {
-    const answer =
-      sources
-        .map((s) => `${s.title}: ${s.content.slice(0, 400)}`)
-        .join("\n\n") || NO_INFO;
-    return {
-      answer: humanizeAnswer(answer),
-      sources,
-    };
+    const answer = sources.map((s) => `${s.title}: ${s.content.slice(0, 400)}`).join("\n\n");
+    return { answer: humanizeAnswer(answer), sources };
   }
 
   const res = await fetch(`https://api.runpod.ai/v2/${endpointId}/runsync`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       input: {
         messages,
-        sampling_params: {
-          max_tokens: 1024,
-          temperature: 0.2,
-          top_p: 1,
-          top_k: -1,
-          seed: -1,
-        },
+        sampling_params: { max_tokens: 700, temperature: 0.2, top_p: 1, top_k: -1, seed: -1 },
       },
     }),
   });
+  if (!res.ok) throw new Error(`Runpod error: ${res.status} ${await res.text()}`);
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Runpod error: ${res.status} ${err}`);
-  }
-
-  const data = await res.json();
-  let answer = extractAnswer(data);
-
-  // If model still claims no info, drop sources
-  const noInfo =
-    answer.toLowerCase().includes("no verified information") ||
-    answer.toLowerCase().includes("knowledge base currently contains no");
-
-  if (noInfo) {
+  const answer = extractAnswer(await res.json());
+  const lower = answer.toLowerCase();
+  if (lower.includes("no verified information") || lower.includes("knowledge base currently contains no")) {
     return { answer: NO_INFO, sources: [] };
   }
-
-  // Human footer only when sources were actually used
-  const cites = sources.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
-  answer = `${answer}\n\nSources:\n${cites}`;
-
   return { answer, sources };
-}
-
-export async function extractFactsFromText(
-  text: string,
-  _uploadedById: string
-): Promise<{ title: string; content: string; type: string }[]> {
-  const paragraphs = cleanText(text)
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 80);
-
-  return paragraphs.slice(0, 10).map((p, i) => {
-    const firstLine = p.split(/[.!?\n]/)[0].slice(0, 120);
-    return {
-      title: firstLine || `Extracted fact ${i + 1}`,
-      content: p.slice(0, 2000),
-      type: "history",
-    };
-  });
 }

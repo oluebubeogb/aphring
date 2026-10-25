@@ -33,13 +33,14 @@ enum KnowledgeStatus {
   REJECTED
 }
 
+/// Explore shelves. DOCUMENT shelf is derived from Document rows, not an entity type.
 enum EntityType {
   PERSON
-  LOCATION
-  TITLE
+  PLACE
+  INSTITUTION
   ORGANIZATION
   EVENT
-  OTHER
+  TOPIC
 }
 
 enum MessageRole {
@@ -59,75 +60,110 @@ enum ReportStatus {
   DISMISSED
 }
 
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  avatar    String?
-  role      Role     @default(USER)
-  reputation Int     @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+}
 
-  knowledgeRecords KnowledgeRecord[] @relation("CreatedBy")
-  verifiedRecords  KnowledgeRecord[] @relation("VerifiedBy")
-  documents        Document[]
-  chats            Chat[]
-  votes            Vote[]
-  reports          Report[]
-  audioUploads     AudioUpload[]
+enum CorrectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum CorrectionField {
+  TITLE
+  CONTENT
+  PLACE
+  ENTITIES
+  OTHER
+}
+
+model User {
+  id         String   @id @default(cuid())
+  /// Lower-case, unique handle. ADMIN_USERNAMES matches against this.
+  username   String   @unique
+  name       String
+  email      String   @unique
+  password   String
+  avatar     String?
+  role       Role     @default(USER)
+  reputation Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  knowledgeRecords    KnowledgeRecord[] @relation("CreatedBy")
+  verifiedRecords     KnowledgeRecord[] @relation("VerifiedBy")
+  documents           Document[]
+  chats               Chat[]
+  votes               Vote[]
+  reports             Report[]
+  audioUploads        AudioUpload[]
+  invitesReceived     ModInvite[]       @relation("InviteTarget")
+  invitesSent         ModInvite[]       @relation("InviteSender")
+  corrections         Correction[]      @relation("CorrectionAuthor")
+  correctionsReviewed Correction[]      @relation("CorrectionReviewer")
+  revisions           RecordRevision[]
+  affinities          UserAffinity[]
+  saves               SavedRecord[]
+  auditLogs           AuditLog[]
 
   @@map("users")
 }
 
-model Community {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  lga         String?
-  ward        String?
-  state       String   @default("Abia")
-  country     String   @default("Nigeria")
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+model ModInvite {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  invitedById String       @map("invited_by")
+  status      InviteStatus @default(PENDING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  respondedAt DateTime?    @map("responded_at")
 
-  knowledgeRecords KnowledgeRecord[]
+  user      User @relation("InviteTarget", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
 
-  @@index([state])
-  @@index([lga])
-  @@map("communities")
+  @@index([userId, status])
+  @@map("mod_invites")
 }
 
 model KnowledgeRecord {
-  id           String          @id @default(cuid())
-  title        String
-  content      String
-  type         KnowledgeType
-  status       KnowledgeStatus @default(DRAFT)
-  embedding    Unsupported("vector(1536)")?
-  sourceRank   Float           @default(0) @map("source_rank")
-  upvotes      Int             @default(0)
-  downvotes    Int             @default(0)
-  createdById  String          @map("created_by")
-  verifiedById String?         @map("verified_by")
-  communityId  String?         @map("community_id")
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
+  id              String          @id @default(cuid())
+  title           String
+  content         String
+  type            KnowledgeType
+  status          KnowledgeStatus @default(PENDING)
+  /// Contributor's free-text place, stored raw. Normalised into a PLACE entity at review.
+  placeText       String?         @map("place_text")
+  embedding       Unsupported("vector(1536)")?
+  /// sha256(title + content) of the text that was last embedded. Skip re-embedding when unchanged.
+  embeddedHash    String?         @map("embedded_hash")
+  embeddedAt      DateTime?       @map("embedded_at")
+  sourceRank      Float           @default(0) @map("source_rank")
+  upvotes         Int             @default(0)
+  downvotes       Int             @default(0)
+  reviewNote      String?         @map("review_note")
+  createdById     String          @map("created_by")
+  verifiedById    String?         @map("verified_by")
+  verifiedAt      DateTime?       @map("verified_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
 
-  createdBy  User              @relation("CreatedBy", fields: [createdById], references: [id])
-  verifiedBy User?             @relation("VerifiedBy", fields: [verifiedById], references: [id])
-  community  Community?        @relation(fields: [communityId], references: [id])
-  citations  Citation[]
-  entities   KnowledgeEntity[]
-  votes      Vote[]
-  reports    Report[]
+  createdBy   User              @relation("CreatedBy", fields: [createdById], references: [id])
+  verifiedBy  User?             @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  citations   Citation[]
+  entities    KnowledgeEntity[]
+  votes       Vote[]
+  reports     Report[]
+  corrections Correction[]
+  revisions   RecordRevision[]
+  saves       SavedRecord[]
 
   @@index([status])
   @@index([type])
-  @@index([communityId])
   @@index([sourceRank])
+  @@index([createdById])
   @@map("knowledge_records")
 }
 
@@ -162,35 +198,136 @@ model Report {
 model Entity {
   id          String     @id @default(cuid())
   name        String
+  slug        String
   entityType  EntityType @map("entity_type")
   description String?
+  /// Alternate spellings, used for rule-based matching and merges.
+  aliases     String[]   @default([])
+  /// Internal catalog rows (e.g. seeded Abia places) are never shown until linked to a VERIFIED record.
+  isCatalog   Boolean    @default(false) @map("is_catalog")
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
   knowledgeLinks KnowledgeEntity[]
+  affinities     UserAffinity[]
 
+  @@unique([entityType, slug])
   @@index([name])
   @@map("entities")
 }
 
 model KnowledgeEntity {
-  id                String @id @default(cuid())
-  knowledgeRecordId String @map("knowledge_record_id")
-  entityId          String @map("entity_id")
+  id                String   @id @default(cuid())
+  knowledgeRecordId String   @map("knowledge_record_id")
+  entityId          String   @map("entity_id")
+  /// RULE | MODERATOR | PLACE | TOPIC | AI
+  source            String   @default("MODERATOR")
+  createdAt         DateTime @default(now()) @map("created_at")
 
   knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
   entity          Entity          @relation(fields: [entityId], references: [id], onDelete: Cascade)
 
   @@unique([knowledgeRecordId, entityId])
+  @@index([entityId])
   @@map("knowledge_entities")
+}
+
+/// Aggregated personalization signal. No raw search or chat text is stored.
+model UserAffinity {
+  userId    String   @map("user_id")
+  entityId  String   @map("entity_id")
+  weight    Float    @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entityId])
+  @@map("user_affinities")
+}
+
+model Correction {
+  id                String           @id @default(cuid())
+  knowledgeRecordId String           @map("knowledge_record_id")
+  proposedById      String           @map("proposed_by")
+  field             CorrectionField
+  proposedText      String           @map("proposed_text")
+  reason            String
+  status            CorrectionStatus @default(PENDING)
+  reviewedById      String?          @map("reviewed_by")
+  reviewNote        String?          @map("review_note")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  reviewedAt        DateTime?        @map("reviewed_at")
+
+  knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
+  proposedBy      User            @relation("CorrectionAuthor", fields: [proposedById], references: [id], onDelete: Cascade)
+  reviewedBy      User?           @relation("CorrectionReviewer", fields: [reviewedById], references: [id])
+
+  @@index([status])
+  @@index([knowledgeRecordId])
+  @@map("corrections")
+}
+
+/// Previous versions of a record, written whenever reviewed text changes.
+model RecordRevision {
+  id                String   @id @default(cuid())
+  knowledgeRecordId String   @map("knowledge_record_id")
+  title             String
+  content           String
+  editedById        String   @map("edited_by")
+  reason            String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
+  editedBy        User            @relation(fields: [editedById], references: [id])
+
+  @@index([knowledgeRecordId])
+  @@map("record_revisions")
+}
+
+model SavedRecord {
+  userId            String   @map("user_id")
+  knowledgeRecordId String   @map("knowledge_record_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
+
+  @@id([userId, knowledgeRecordId])
+  @@map("saved_records")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  @map("actor_id")
+  action    String
+  target    String?
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Operational key/value flags (embeddings coverage notes, etc.).
+model OpsState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ops_state")
 }
 
 model Document {
   id           String   @id @default(cuid())
   filename     String
+  /// Internal storage key. Never returned by public endpoints.
   path         String
   mimeType     String   @map("mime_type")
   size         Int
+  placeText    String?  @map("place_text")
   uploadedById String   @map("uploaded_by")
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -210,6 +347,7 @@ model Citation {
   knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
   document        Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  @@index([documentId])
   @@map("citations")
 }
 
@@ -232,6 +370,8 @@ model Message {
   chatId    String      @map("chat_id")
   role      MessageRole
   content   String
+  /// Record ids cited by an assistant message.
+  sourceIds String[]    @default([]) @map("source_ids")
   createdAt DateTime    @default(now()) @map("created_at")
 
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
@@ -249,8 +389,8 @@ model AudioUpload {
   durationSec  Int?     @map("duration_sec")
   transcript   String?
   status       String   @default("PENDING") // PENDING | TRANSCRIBED | EXTRACTED | FAILED
+  placeText    String?  @map("place_text")
   uploadedById String   @map("uploaded_by")
-  communityId  String?  @map("community_id")
   createdAt    DateTime @default(now()) @map("created_at")
 
   uploadedBy User @relation(fields: [uploadedById], references: [id])

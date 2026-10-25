@@ -1,86 +1,77 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { prisma } from "../services/prisma.js";
-import { requireAuth, AuthRequest } from "../middleware/auth.js";
+import { requireAuth, AuthRequest, signToken } from "../middleware/auth.js";
+import { syncRole } from "../services/roles.js";
 
 const router = Router();
 
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+
+export const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
+
 const registerSchema = z.object({
-  name: z.string().min(2).max(100),
-  email: z.string().email(),
-  password: z.string().min(8),
+  name: z.string().trim().min(2).max(100),
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(USERNAME_RE, "Username must be 3–30 characters: letters, numbers or underscore"),
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8).max(200),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+  /** Username or email. `email` accepted for backwards compatibility. */
+  identifier: z.string().trim().min(1).optional(),
+  email: z.string().trim().optional(),
+  password: z.string().min(1),
 });
 
-router.post("/register", async (req, res, next) => {
+function publicUser(u: { id: string; username: string; name: string; email: string; role: string; avatar: string | null; reputation: number }) {
+  return { id: u.id, username: u.username, name: u.name, email: u.email, role: u.role, avatar: u.avatar, reputation: u.reputation };
+}
+
+router.post("/register", authLimiter, async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
-    const existing = await prisma.user.findUnique({
-      where: { email: body.email },
+    const clash = await prisma.user.findFirst({
+      where: { OR: [{ email: body.email }, { username: body.username }] },
+      select: { email: true, username: true },
     });
-    if (existing) {
-      return res.status(400).json({ error: "Email already registered" });
+    if (clash) {
+      return res.status(400).json({
+        error: clash.username === body.username ? "Username is taken" : "Email already registered",
+      });
     }
-
-    const hashed = await bcrypt.hash(body.password, 12);
     const user = await prisma.user.create({
       data: {
         name: body.name,
+        username: body.username,
         email: body.email,
-        password: hashed,
+        password: await bcrypt.hash(body.password, 12),
       },
-      select: { id: true, name: true, email: true, role: true },
     });
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || "dev-secret",
-      { expiresIn: "7d" }
-    );
-
-    res.status(201).json({ user, token });
+    const role = await syncRole(user);
+    res.status(201).json({ user: publicUser({ ...user, role }), token: signToken(user) });
   } catch (err) {
     next(err);
   }
 });
 
-router.post("/login", async (req, res, next) => {
+router.post("/login", authLimiter, async (req, res, next) => {
   try {
     const body = loginSchema.parse(req.body);
-    const user = await prisma.user.findUnique({
-      where: { email: body.email },
-    });
-    if (!user) {
+    const id = (body.identifier || body.email || "").toLowerCase();
+    if (!id) return res.status(400).json({ error: "Username or email is required" });
+    const user = await prisma.user.findFirst({ where: id.includes("@") ? { email: id } : { username: id } });
+    if (!user || !(await bcrypt.compare(body.password, user.password))) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-
-    const valid = await bcrypt.compare(body.password, user.password);
-    if (!valid) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || "dev-secret",
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-      },
-      token,
-    });
+    const role = await syncRole(user);
+    res.json({ user: publicUser({ ...user, role }), token: signToken(user) });
   } catch (err) {
     next(err);
   }
@@ -88,19 +79,9 @@ router.post("/login", async (req, res, next) => {
 
 router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatar: true,
-        createdAt: true,
-      },
-    });
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    res.json({ ...publicUser(user), createdAt: user.createdAt });
   } catch (err) {
     next(err);
   }

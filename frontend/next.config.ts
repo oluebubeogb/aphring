@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      { source: "/admin", destination: "/workstation", permanent: false },
+      { source: "/community", destination: "/explore", permanent: false },
+      { source: "/community/:slug*", destination: "/explore", permanent: false },
+    ];
+  },
   async rewrites() {
     return [
       {

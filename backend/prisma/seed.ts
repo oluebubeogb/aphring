@@ -1,9 +1,16 @@
+/**
+ * Seed: internal catalog only.
+ * - Abia places become PLACE entities with isCatalog=true. They are used to normalise
+ *   contributors' free-text places and to suggest entities. They never appear on Explore
+ *   until a VERIFIED record links to them.
+ * - No users are created. Admins come from ADMIN_USERNAMES; there is no default password.
+ * Safe to run repeatedly.
+ */
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const communities = [
+const places = [
   // Arochukwu
   { name: "Obinkita", slug: "obinkita", lga: "Arochukwu", ward: "Obinkita", state: "Abia" },
   { name: "Arochukwu", slug: "arochukwu", lga: "Arochukwu", state: "Abia" },
@@ -38,33 +45,22 @@ const communities = [
 ];
 
 async function main() {
-  const password = await bcrypt.hash("admin123456", 12);
-
-  await prisma.user.upsert({
-    where: { email: "admin@aphring.com" },
-    update: { role: "ADMIN", password },
-    create: {
-      name: "Aphring Admin",
-      email: "admin@aphring.com",
-      password,
-      role: "ADMIN",
-      reputation: 100,
-    },
-  });
-
-  console.log("Admin: admin@aphring.com / admin123456");
-
-  for (const c of communities) {
-    await prisma.community.upsert({
-      where: { slug: c.slug },
-      update: c,
-      create: c,
+  for (const p of places) {
+    const aliases = Array.from(new Set([`${p.name}, ${p.state}`, p.lga !== p.name ? `${p.name}, ${p.lga}` : ""].filter(Boolean)));
+    const description = `${p.lga} LGA, ${p.state} State`;
+    await prisma.entity.upsert({
+      where: { entityType_slug: { entityType: "PLACE", slug: p.slug } },
+      update: { isCatalog: true, aliases, description },
+      create: { name: p.name, slug: p.slug, entityType: "PLACE", isCatalog: true, aliases, description },
     });
   }
-
-  console.log(`Seeded ${communities.length} Abia communities (Phase 2)`);
+  console.log(`Seeded ${places.length} catalog places (hidden until linked to verified records).`);
+  console.log("No admin user is seeded. Set ADMIN_USERNAMES and register that username.");
 }
 
 main()
-  .catch(console.error)
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
   .finally(() => prisma.$disconnect());

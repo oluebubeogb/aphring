@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Plus, MessageSquare, Send, Menu, X, BookOpen } from "lucide-react";
-import { api, isLoggedIn, clearToken } from "@/lib/api";
+import { api, isLoggedIn, clearToken, isStaff, getStoredUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 
 interface Chat {
@@ -18,6 +18,7 @@ interface Message {
   role: "USER" | "ASSISTANT" | "SYSTEM";
   content: string;
   createdAt: string;
+  sources?: { id: string; title: string; type: string }[];
 }
 
 function ChatContent() {
@@ -33,6 +34,8 @@ function ChatContent() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialQ = searchParams.get("q");
   const startedRef = useRef(false);
+  const [staff, setStaff] = useState(false);
+  useEffect(() => setStaff(isStaff(getStoredUser())), []);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -112,14 +115,14 @@ function ChatContent() {
     setMessages((m) => [...m, tempUser]);
 
     try {
-      const res = await api<{ message: Message }>(`/api/chats/${id}/messages`, {
+      const res = await api<{ message: Message; sources: Message["sources"] }>(`/api/chats/${id}/messages`, {
         method: "POST",
         body: JSON.stringify({ content }),
       });
       setMessages((m) => [
         ...m.filter((x) => x.id !== tempUser.id),
         { ...tempUser, id: "user-" + Date.now() },
-        res.message,
+        { ...res.message, sources: res.sources },
       ]);
       loadChats();
     } catch (err: any) {
@@ -193,8 +196,19 @@ function ChatContent() {
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition"
           >
             <BookOpen className="w-4 h-4" />
-            Communities
+            Explore
           </Link>
+          <Link href="/feed" className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition">
+            Feed
+          </Link>
+          <Link href="/me" className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition">
+            My profile
+          </Link>
+          {staff && (
+            <Link href="/workstation" className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition">
+              Workstation
+            </Link>
+          )}
           <button
             onClick={toggle}
             className="w-full text-left px-3 py-2 rounded-lg text-secondary hover:bg-background transition"
@@ -234,8 +248,8 @@ function ChatContent() {
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
               <h2 className="text-2xl font-semibold">Ask Aphring</h2>
               <p className="text-secondary max-w-md">
-                Answers come only from verified community knowledge. No
-                hallucinations.
+                Answers come only from verified records, with links to each
+                source. If nothing verified matches, Aphring says so.
               </p>
             </div>
           )}
@@ -256,6 +270,20 @@ function ChatContent() {
                   }`}
                 >
                   {m.content}
+                  {m.role === "ASSISTANT" && m.sources && m.sources.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-border flex flex-wrap gap-1.5 whitespace-normal">
+                      <span className="text-xs text-secondary">Sources:</span>
+                      {m.sources.map((s, i) => (
+                        <Link
+                          key={s.id}
+                          href={`/record/${s.id}`}
+                          className="text-xs px-2 py-0.5 rounded-full border border-border text-secondary hover:text-primary"
+                        >
+                          [{i + 1}] {s.title}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

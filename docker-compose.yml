@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   postgres:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: aphring
-      POSTGRES_PASSWORD: aphring_secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aphring_secret}
       POSTGRES_DB: aphring
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -27,17 +25,22 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://aphring:aphring_secret@postgres:5432/aphring?schema=public
+      DATABASE_URL: postgresql://aphring:${POSTGRES_PASSWORD:-aphring_secret}@postgres:5432/aphring?schema=public
       STORAGE_PATH: /app/uploads
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      RUNPOD_API_KEY: ${RUNPOD_API_KEY}
-      RUNPOD_ENDPOINT_ID: ${RUNPOD_ENDPOINT_ID:-granite-4-0-h-small}
-      EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       NODE_ENV: production
       PORT: 4000
-      FRONTEND_URL: ${FRONTEND_URL:-*}
+      # REQUIRED: >= 32 random chars. The backend refuses to start without it.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (openssl rand -hex 32)}
+      # Comma-separated usernames that are admins. Removing a name demotes that user on next request.
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      RUNPOD_API_KEY: ${RUNPOD_API_KEY:-}
+      RUNPOD_ENDPOINT_ID: ${RUNPOD_ENDPOINT_ID:-}
+      EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Only needed if browsers call the backend directly (the frontend proxies /api).
+      FRONTEND_URL: ${FRONTEND_URL:-}
     volumes:
       - uploads_data:/app/uploads
     expose:
@@ -56,8 +59,6 @@ services:
       - backend
     environment:
       BACKEND_URL: http://backend:4000
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-production}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
     expose:
       - "3000"
     networks:

@@ -1,14 +1,25 @@
 import { Request, Response, NextFunction } from "express";
+import { ZodError } from "zod";
+import multer from "multer";
 
-export function errorHandler(
-  err: any,
-  _req: Request,
-  res: Response,
-  _next: NextFunction
-) {
-  console.error(err);
+export class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      error: err.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "),
+    });
+  }
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.message });
+  }
   const status = err.status || 500;
+  if (status >= 500) console.error(err);
   res.status(status).json({
-    error: err.message || "Internal server error",
+    error: status >= 500 && process.env.NODE_ENV === "production" ? "Internal server error" : err.message || "Internal server error",
   });
 }

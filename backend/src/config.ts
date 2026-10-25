@@ -1,0 +1,83 @@
+/**
+ * Centralised runtime configuration. Fails fast in production when
+ * security-critical values are missing or weak.
+ */
+import dotenv from "dotenv";
+
+dotenv.config();
+
+export const isProduction = process.env.NODE_ENV === "production";
+
+const KNOWN_BAD_SECRETS = new Set([
+  "dev-secret",
+  "change-me-in-production",
+  "change-me-to-a-long-random-string",
+  "secret",
+  "changeme",
+]);
+
+const DEV_JWT_SECRET = "DEV-ONLY-insecure-jwt-secret-do-not-use-in-production";
+
+let cachedSecret: string | null = null;
+
+export function getJwtSecret(): string {
+  if (cachedSecret) return cachedSecret;
+  const raw = (process.env.JWT_SECRET || "").trim();
+  if (isProduction) {
+    if (!raw) throw new Error("JWT_SECRET is required when NODE_ENV=production");
+    if (raw.length < 32 || KNOWN_BAD_SECRETS.has(raw)) {
+      throw new Error(
+        "JWT_SECRET is too weak: use at least 32 random characters (e.g. `openssl rand -hex 32`)"
+      );
+    }
+    cachedSecret = raw;
+  } else {
+    if (!raw) {
+      console.warn("[config] JWT_SECRET not set — using explicit DEV-only secret (NODE_ENV != production)");
+    }
+    cachedSecret = raw || DEV_JWT_SECRET;
+  }
+  return cachedSecret;
+}
+
+/** Usernames from ADMIN_USERNAMES (comma separated), lower-cased and trimmed. */
+export function getAdminUsernames(): Set<string> {
+  return new Set(
+    (process.env.ADMIN_USERNAMES || "")
+      .split(",")
+      .map((u) => u.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+export function isEnvAdmin(username: string): boolean {
+  return getAdminUsernames().has(username.trim().toLowerCase());
+}
+
+/** Real embeddings configured? Pseudo-embeddings are never allowed in production. */
+export function embeddingConfig() {
+  const key = (process.env.EMBEDDING_API_KEY || "").trim();
+  const allowFake = !isProduction && process.env.ALLOW_FAKE_EMBEDDINGS === "true";
+  return {
+    url: process.env.EMBEDDING_API_URL || "https://api.openai.com/v1",
+    key,
+    model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
+    enabled: !!key || allowFake,
+    fake: !key && allowFake,
+  };
+}
+
+export function validateStartupConfig() {
+  getJwtSecret();
+  const emb = embeddingConfig();
+  if (!emb.enabled) {
+    console.warn(
+      "[config] EMBEDDING_API_KEY not set — vector search disabled; chat falls back to keyword retrieval."
+    );
+  } else if (emb.fake) {
+    console.warn("[config] ALLOW_FAKE_EMBEDDINGS=true — pseudo-embeddings in use (dev only).");
+  }
+  if (getAdminUsernames().size === 0) {
+    console.warn("[config] ADMIN_USERNAMES is empty — nobody will have admin access.");
+  }
+}
