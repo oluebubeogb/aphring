@@ -7,7 +7,7 @@ import Header from "@/components/Header";
 import EntityTile, { type ExploreEntity } from "@/components/EntityTile";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api, downloadFile, exploreSeed, timeAgo } from "@/lib/api";
-import { Chip, entityHref, entityNameCls, inputCls, Notice, Page } from "@/components/ui";
+import { Chip, entityHref, inputCls, Notice, Page } from "@/components/ui";
 
 interface ExploreData {
   personalized: boolean;
@@ -92,7 +92,7 @@ export default function ExplorePage() {
               <div className="flex flex-wrap gap-2">
                 {results.entities.map((e) => (
                   <Chip key={e.id} href={entityHref(e)}>
-                    <span className={entityNameCls(e)}>{e.name}</span>
+                    {e.name}
                   </Chip>
                 ))}
               </div>

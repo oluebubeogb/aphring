@@ -3,15 +3,7 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { prisma } from "../services/prisma.js";
 import { requireAuth, optionalAuth, AuthRequest } from "../middleware/auth.js";
-import {
-  retrieveContext,
-  generateAnswer,
-  AiServiceError,
-  NO_INFO,
-  RetrievedSource,
-  suggestChatTitle,
-  fallbackChatTitle,
-} from "../services/ai.js";
+import { retrieveContext, generateAnswer, AiServiceError, NO_INFO, RetrievedSource, suggestChatTitle, fallbackChatTitle, buildSearchQuery } from "../services/ai.js";
 import { createAskJob, getAskJob, completeAskJob, failAskJob, patchAskJob, AskJob } from "../services/askJobs.js";
 import { bumpFromRecords, SIGNAL_WEIGHTS, track } from "../services/affinity.js";
 
@@ -224,6 +216,15 @@ router.post("/:id/messages", chatLimiter, async (req: AuthRequest, res, next) =>
     const chat = await prisma.chat.findFirst({ where: { id: chatId, userId: req.user!.id } });
     if (!chat) return res.status(404).json({ error: "Chat not found" });
 
+    // Load prior turns BEFORE saving this message so follow-ups can resolve "him"/"that".
+    const prior = await prisma.message.findMany({
+      where: { chatId },
+      orderBy: { createdAt: "asc" },
+      select: { role: true, content: true },
+      take: 12,
+    });
+    const priorUsers = prior.filter((m) => m.role === "USER").map((m) => m.content).reverse();
+
     await prisma.message.create({ data: { chatId, role: "USER", content } });
     let title = chat.title;
     if (title === "New Chat") {
@@ -232,7 +233,8 @@ router.post("/:id/messages", chatLimiter, async (req: AuthRequest, res, next) =>
       await prisma.chat.update({ where: { id: chatId }, data: { title } });
     }
 
-    const sources = await retrieveContext(content);
+    const searchQuery = buildSearchQuery(content, priorUsers);
+    const sources = await retrieveContext(searchQuery);
     if (sources.length === 0) {
       // No verified match → save the fixed answer, no model call.
       const assistantMsg = await prisma.message.create({
@@ -245,7 +247,7 @@ router.post("/:id/messages", chatLimiter, async (req: AuthRequest, res, next) =>
     const userId = req.user!.id;
     const jobId = createAskJob({ chatId, userId });
     (async () => {
-      const { answer, sources: used } = await generateAnswer(content, sources);
+      const { answer, sources: used } = await generateAnswer(content, sources, { history: prior });
       const sourceIds = used.map((s) => s.id);
       const assistantMsg = await prisma.message.create({
         data: { chatId, role: "ASSISTANT", content: answer, sourceIds },

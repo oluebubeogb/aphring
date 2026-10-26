@@ -6,7 +6,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api } from "@/lib/api";
-import { Chip, entityHref, entityNameCls, Notice, Page } from "@/components/ui";
+import { Chip, entityHref, Notice, Page } from "@/components/ui";
 
 interface EntityPage {
   entity: { id: string; name: string; slug: string; type: string; label: string; description: string | null; aliases: string[] };
@@ -40,7 +40,7 @@ export default function EntityPageView() {
         {data && (
           <div className="grid lg:grid-cols-[1fr_260px] gap-8 mt-3">
             <div>
-              <h1 className={`text-3xl font-semibold tracking-tight ${entityNameCls(data.entity)}`}>{data.entity.name}</h1>
+              <h1 className="text-3xl font-semibold tracking-tight">{data.entity.name}</h1>
               {data.entity.description && <p className="text-secondary mt-1">{data.entity.description}</p>}
               {data.entity.aliases.length > 0 && (
                 <p className="text-sm text-secondary mt-1">Also known as {data.entity.aliases.join(", ")}</p>
@@ -57,7 +57,7 @@ export default function EntityPageView() {
                 <div className="flex flex-wrap gap-2">
                   {data.related.map((r) => (
                     <Chip key={r.id} href={entityHref(r)} title={`${r.shared} shared record(s)`}>
-                      <span className={entityNameCls(r)}>{r.name}</span>
+                      {r.name}
                     </Chip>
                   ))}
                 </div>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowBigDown, ArrowBigUp, Bookmark, BookmarkCheck, Download, FileText, Flag, Share2, PencilLine } from "lucide-react";
 import { api, downloadFile, isLoggedIn, timeAgo } from "@/lib/api";
-import { Chip, entityHref, entityNameCls } from "@/components/ui";
+import { Chip, entityHref, knowledgeTypeCls } from "@/components/ui";
 
 export interface RecordEntity {
   id: string;
@@ -170,7 +170,7 @@ export function EntityChips({ entities }: { entities: RecordEntity[] }) {
     <div className="flex flex-wrap gap-1.5">
       {entities.map((e) => (
         <Chip key={e.id} href={entityHref(e)} title={e.entityType.toLowerCase()}>
-          <span className={entityNameCls(e)}>{e.name}</span>
+          {e.name}
         </Chip>
       ))}
     </div>
@@ -183,7 +183,7 @@ export default function RecordCard({ record, clamp = true }: { record: PublicRec
   return (
     <article className="p-4 rounded-xl border border-border bg-surface space-y-2">
       <div className="flex items-center gap-2 text-xs text-secondary flex-wrap">
-        <span className="uppercase tracking-wide">{rec.type}</span>
+        <span className={knowledgeTypeCls}>{rec.type}</span>
         {rec.placeText && <span>· {rec.placeText}</span>}
         {rec.createdBy && (
           <>

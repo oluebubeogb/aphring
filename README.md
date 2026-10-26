@@ -88,6 +88,8 @@ Coolify/Traefik read timeout to 180 s or more is optional but still helps other 
 
 ## Chat, answers and sources
 
+Ask answers the question first (including clear “not in the verified records” when exact facts are missing), then related verified detail. Follow-ups like “was a seaport named after him” reuse earlier turns for retrieval and pronouns. A raw excerpt dump is no longer used when the model hedges.
+
 - **Chat permalinks.** Each saved conversation lives at `/chat/:id`, so a refresh (or a shared tab) reopens
   the same chat. `/chat` is a new conversation (and guest Ask); the first question creates the chat and the
   address bar moves to `/chat/:id`. Only the owner can open a chat; anything else goes back to `/chat`.
@@ -106,7 +108,7 @@ Coolify/Traefik read timeout to 180 s or more is optional but still helps other 
 - **Explore tiles.** Tiles show a short excerpt from a random verified record linked to that entity (around
   the first mention of its name). No personalisation captions; ranking still adapts quietly. No AI on Explore.
   Tiles, entity pages and document cards no longer print "N verified records" (counts still drive ranking).
-- **PERSON names** render bold in small caps on tiles, chips and entity pages.
+- **Record category labels** (person, history, traditional, …) render bold in small caps on cards and record pages; entity name tags stay normal weight.
 
 ## Documents, re-chunk and bulk review
 

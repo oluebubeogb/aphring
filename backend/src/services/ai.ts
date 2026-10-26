@@ -13,11 +13,15 @@ Rules:
    - Start with one short lead sentence that answers the question directly.
    - Then use short paragraphs of 2–4 sentences each, one idea per paragraph (e.g. early life, work, legacy).
    - Put a blank line between paragraphs.
-   - You may use *italics* for titles of books or works; avoid headings and long bullet lists.
+   - For book or work titles, use plain quotation marks (e.g. "Things Fall Apart"), never markdown (*italics*, **bold**, _underscores_, # headings, or bullet lists).
 4. If the context does not contain relevant information for the question, reply with exactly this sentence and nothing else:
 The Aphring knowledge base currently contains no verified information about this topic.
 5. When you do answer from context, do not invent source labels in the body — the system will attach sources separately only when relevant.
-6. Strip any odd characters from source text (control characters, excessive backslashes) and rephrase into readable prose.`;
+6. Strip any odd characters from source text (control characters, excessive backslashes) and rephrase into readable prose.
+7. Answer the user's actual question first, in one clear opening sentence (yes, no, not in the verified records, or partly).
+8. If the exact thing they asked is not in the context, say that plainly — for example: "The verified records do not mention a seaport named after him." Then, if the context has a closely related fact about the same person or place (an airport, an aircraft, a building, an award), say that next and give a short useful detail from the context (what was named, when, where, who was involved).
+9. Never dump raw source titles or truncated snippets. Always write a natural, spoken answer in short paragraphs.
+10. Do not use the fixed "no verified information" sentence when the context has related information about the same person or topic — follow rule 8 instead. That fixed sentence is only for when nothing in the context is relevant at all.`;
 
 export interface RetrievedSource {
   id: string;
@@ -29,6 +33,8 @@ export interface RetrievedSource {
 
 export const NO_INFO =
   "The Aphring knowledge base currently contains no verified information about this topic.";
+
+type ChatMessage = { role: string; content: string };
 
 /** Distance threshold: higher = less similar. Only keep tight matches. */
 const MAX_DISTANCE = 0.55;
@@ -233,10 +239,17 @@ function cleanText(text: string): string {
     .replace(/\\"/g, '"')
     .replace(/\\r/g, "")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    // Drop markdown emphasis the model still emits (*title*, **bold**, _title_).
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, '"$1"')
+    .replace(/_([^_\n]+)_/g, '"$1"')
+    .replace(/^[ \t]*#{1,6}\s+/gm, "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
 
 /** Abbreviations / initials that end in "." but don't end a sentence. */
 const NON_TERMINAL = /(?:\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Gen|Col|Lt|Capt|Rev|Hon|Gov|Sen|Rt|No|vs|etc|e\.g|i\.e|c|ca|approx|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)|\b[A-Z])\.$/;
@@ -268,9 +281,57 @@ function paragraphize(text: string): string {
   return paras.join("\n\n");
 }
 
+export type ChatTurn = { role: "USER" | "ASSISTANT" | "SYSTEM" | string; content: string };
+
+/** Pronoun / short follow-ups need earlier user questions for retrieval. */
+export function looksLikeFollowUp(question: string): boolean {
+  const q = question.trim();
+  if (q.length <= 90) return true;
+  return /\b(he|she|him|her|his|hers|they|them|their|it|this|that|these|those|the same)\b/i.test(q);
+}
+
+/** Merge the current question with earlier user turns so "him" still finds Chinua Achebe. */
+export function buildSearchQuery(question: string, priorUserMessages: string[] = []): string {
+  const q = question.trim();
+  if (!priorUserMessages.length || !looksLikeFollowUp(q)) return q;
+  const hint = priorUserMessages
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+  return hint ? `${q} ${hint}` : q;
+}
+
+function stripAboutPrefix(content: string): string {
+  return content.replace(/^About [^\n]+\n+/i, "").trim();
+}
+
+function isBareNoInfo(answer: string): boolean {
+  const s = answer.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!s) return true;
+  if (s === NO_INFO.toLowerCase()) return true;
+  // Exact canned line only — a longer answer that mentions the phrase is fine.
+  return s.length < 120 && s.includes("no verified information") && !/\b(but|however|airport|aircraft|named|instead|related)\b/i.test(s);
+}
+
+/** Last-resort natural answer when the model still refuses despite having sources. */
+function relatedFallback(question: string, sources: RetrievedSource[]): string {
+  const bits = sources.slice(0, 3).map((s) => {
+    const body = stripAboutPrefix(s.content).replace(/\s+/g, " ").trim();
+    const clip = body.length > 280 ? `${body.slice(0, 277).replace(/\s+\S*$/, "")}…` : body;
+    return `${s.title}. ${clip}`;
+  });
+  return humanizeAnswer(
+    `The verified records do not clearly answer that exact question from what is on file.\n\n` +
+      `Here is the closest related information:\n\n` +
+      bits.join("\n\n")
+  );
+}
+
 export async function generateAnswer(
   question: string,
-  sources: RetrievedSource[]
+  sources: RetrievedSource[],
+  opts: { history?: ChatTurn[] } = {}
 ): Promise<{ answer: string; sources: RetrievedSource[] }> {
   // No relevant sources → fixed message, no model call (cost control).
   if (sources.length === 0) return { answer: NO_INFO, sources: [] };
@@ -278,37 +339,57 @@ export async function generateAnswer(
   let budget = MAX_CONTEXT_CHARS;
   const parts: string[] = [];
   for (const [i, s] of sources.entries()) {
-    const body = s.content.slice(0, Math.min(MAX_CHARS_PER_SOURCE, Math.max(0, budget)));
+    const body = stripAboutPrefix(s.content).slice(0, Math.min(MAX_CHARS_PER_SOURCE, Math.max(0, budget)));
     if (!body) break;
     parts.push(`Source ${i + 1} (${s.type}): ${s.title}\n${body}`);
     budget -= body.length;
   }
-  const messages = [
+
+  const history = (opts.history || [])
+    .filter((m) => m.role === "USER" || m.role === "ASSISTANT")
+    .slice(-4)
+    .map((m) => ({
+      role: m.role === "ASSISTANT" ? "assistant" : "user",
+      content: m.content.length > 600 ? `${m.content.slice(0, 597)}…` : m.content,
+    }));
+
+  const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
+    ...history,
     {
       role: "user",
-      content: `Context from the Aphring knowledge base:\n\n${parts.join("\n\n")}\n\nQuestion: ${question}\n\nWrite a clear answer for a general reader. Use only the context above.`,
+      content:
+        `Context from the Aphring knowledge base:\n\n${parts.join("\n\n")}\n\n` +
+        `Question: ${question}\n\n` +
+        `Answer the question first. If the exact fact is missing, say so, then give the closest related verified facts with useful detail. Use only the context above. Plain language, short paragraphs, quotation marks for titles — no markdown.`,
     },
   ];
 
   const chat = chatConfig();
-  const excerpts = () =>
-    humanizeAnswer(sources.map((s) => `${s.title}: ${s.content.slice(0, 400)}${s.content.length > 400 ? "…" : ""}`).join("\n\n"));
+  // No model configured: return a natural related fallback (zero cost), not a raw dump.
+  if (!chat.configured) return { answer: relatedFallback(question, sources), sources };
 
-  // No model configured: return verified excerpts directly (zero cost).
-  if (!chat.configured) return { answer: excerpts(), sources };
-
-  const answer = await callChatModel(messages, 700);
-
-  const lower = answer.toLowerCase();
-  if (lower.includes("no verified information") || lower.includes("knowledge base currently contains no")) {
-    // We DID find verified records; show them rather than claiming there's nothing.
-    return { answer: `Here is what the verified records say:\n\n${excerpts()}`, sources };
+  let answer = await callChatModel(messages, 700);
+  if (isBareNoInfo(answer)) {
+    // Model ignored related context — one cheap retry, then a written fallback (never a snippet dump).
+    answer = await callChatModel(
+      [
+        ...messages,
+        {
+          role: "user",
+          content:
+            "Your previous reply claimed there was no information, but context sources were provided. " +
+            "Answer again using rules 7–8: say what is missing for this exact question, then summarise the closest related verified facts in clear paragraphs. " +
+            "Do not use the fixed \"no verified information\" sentence.",
+        },
+      ],
+      700,
+      "chat-retry"
+    );
+    if (isBareNoInfo(answer)) answer = relatedFallback(question, sources);
   }
   return { answer, sources };
 }
-
-type ChatMessage = { role: string; content: string };
 
 /** One chat-model call (RunPod OpenAI-compatible or legacy serverless). Throws AiServiceError on failure. */
 async function callChatModel(messages: ChatMessage[], maxTokens: number, label = "chat"): Promise<string> {
