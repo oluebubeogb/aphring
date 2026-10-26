@@ -46,11 +46,11 @@ Use a **new empty Postgres** (new Coolify project / new volume). This build ship
 | `DATABASE_URL` | local dev | Set automatically by compose. |
 | `RUNPOD_API_KEY`, `RUNPOD_BASE_URL`, `RUNPOD_MODEL` | no | Chat via OpenAI-compatible API (RunPod). Without them, Ask returns verified excerpts with no model call. Optional legacy: `RUNPOD_ENDPOINT_ID` for serverless `/runsync`. |
 | `EMBEDDING_API_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` | no | Semantic search. Records are embedded once, when verified. Without them, keyword search is used. |
-| `MAIL_PROVIDER` | no | `resend`, `smtp` or `console`. Empty = auto (Resend key → resend, `SMTP_HOST` → smtp, else console). Console prints the word in the backend log and sends nothing. |
-| `MAIL_FROM` | with mail | Sender, e.g. `Aphring <no-reply@aphring.ng>` (must be a verified domain on Resend). |
+| `MAIL_PROVIDER` | no | Default **`smtp`**. Also `resend` or `console`. Empty = auto (`SMTP_HOST` → smtp, Resend key → resend, else console). Console prints the word in the backend log and sends nothing. |
+| `MAIL_FROM` | with mail | Sender, e.g. `Aphring <no-reply@aphring.ng>`. |
 | `APP_URL` | with mail | Public site URL used in email links (falls back to `FRONTEND_URL`). |
-| `RESEND_API_KEY` | resend | Resend API key. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` | smtp | Any SMTP server. `SMTP_SECURE=true` for port 465. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` | smtp (default) | Any SMTP server. Port `587` by default; `SMTP_SECURE=true` for port 465. |
+| `RESEND_API_KEY` | resend | Optional. Set `MAIL_PROVIDER=resend` to use Resend instead of SMTP. |
 | `OPENAI_API_KEY` | no | Whisper transcription for oral uploads. Without it, contributors paste a transcript. |
 | `FRONTEND_URL` | no | CORS origin(s), only if browsers call the backend directly. |
 | `STORAGE_PATH` | no | Upload directory (compose: `/app/uploads`, a named volume). |
@@ -79,6 +79,12 @@ Ask first does a keyword search over verified records (title, text, entity names
 like "tell me about" are ignored), then adds semantic matches if embeddings are configured. If nothing
 matches, it answers "no verified information" without calling the model. If the chat model fails, Ask
 shows the real reason (bad key, wrong model, timeout) instead of pretending nothing was found.
+
+**Long answers and proxy timeouts.** When Ask needs the model it starts a background job and returns at
+once; the page then polls every 1.5 s (up to 3 minutes) for the answer. A RunPod cold start can take
+1–2 minutes, so this stops Coolify/Traefik/Next from cutting the request (502/504) after RunPod has already
+finished and billed. Jobs live in backend memory for 15 minutes (single backend replica). Raising the
+Coolify/Traefik read timeout to 180 s or more is optional but still helps other long routes such as uploads.
 
 ## Documents, re-chunk and bulk review
 

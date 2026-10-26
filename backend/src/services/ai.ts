@@ -261,6 +261,8 @@ export async function generateAnswer(
   if (!chat.configured) return { answer: excerpts(), sources };
 
   let answer: string;
+  const started = Date.now();
+  const secs = () => ((Date.now() - started) / 1000).toFixed(1);
   try {
     if (chat.openaiCompatible) {
       // RunPod (and most hosts): OpenAI-compatible /chat/completions
@@ -268,7 +270,7 @@ export async function generateAnswer(
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${chat.key}` },
         body: JSON.stringify({ model: chat.model, messages, max_tokens: 700, temperature: 0.2 }),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(180_000),
       });
       if (!res.ok) throw upstreamError(res.status, await res.text());
       answer = extractAnswer(await res.json());
@@ -282,7 +284,7 @@ export async function generateAnswer(
         body: JSON.stringify({
           input: { messages, sampling_params: { max_tokens: 700, temperature: 0.2, top_p: 1, top_k: -1, seed: -1 } },
         }),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(180_000),
       });
       if (!res.ok) throw upstreamError(res.status, await res.text());
       let data: any = await res.json();
@@ -295,9 +297,13 @@ export async function generateAnswer(
       if (data?.status === "FAILED") throw new AiServiceError("The AI service failed to answer. Please try again.");
       answer = extractAnswer(data);
     }
+    console.info(`[ai] chat completed in ${secs()}s`);
   } catch (err: any) {
-    if (err instanceof AiServiceError) throw err;
-    console.error("[ai] chat model call failed:", err?.message || err);
+    if (err instanceof AiServiceError) {
+      console.error(`[ai] chat failed after ${secs()}s: ${err.message}`);
+      throw err;
+    }
+    console.error(`[ai] chat model call failed after ${secs()}s:`, err?.message || err);
     throw new AiServiceError(
       err?.name === "TimeoutError" || err?.name === "AbortError"
         ? "The AI service took too long to respond. Please try again."

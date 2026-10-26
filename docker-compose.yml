@@ -42,8 +42,8 @@ services:
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      # Email: resend | smtp | console (auto-detected when empty). See .env.example.
-      MAIL_PROVIDER: ${MAIL_PROVIDER:-}
+      # Email default: SMTP. See .env.example.
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-smtp}
       MAIL_FROM: ${MAIL_FROM:-Aphring <no-reply@aphring.local>}
       APP_URL: ${APP_URL:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}

@@ -21,6 +21,39 @@ interface Message {
   sources?: { id: string; title: string; type: string }[];
 }
 
+type JobStatus = "pending" | "done" | "error";
+interface JobResponse {
+  status?: JobStatus;
+  jobId?: string;
+  error?: string;
+  answer?: string;
+  message?: Message;
+  sources?: Message["sources"];
+}
+
+const POLL_MS = 1500;
+const POLL_MAX_MS = 3 * 60 * 1000;
+
+/** Ask answers in the background (RunPod can take 1–2 min); poll the job until it finishes. */
+async function waitForJob(first: JobResponse, pollPath: (jobId: string) => string): Promise<JobResponse> {
+  if (first.status !== "pending" || !first.jobId) return first;
+  const deadline = Date.now() + POLL_MAX_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_MS));
+    let job: JobResponse;
+    try {
+      job = await api<JobResponse>(pollPath(first.jobId));
+    } catch (err: any) {
+      // Brief gateway blips while polling shouldn't kill the wait; a 404 means the job is gone.
+      if (err?.status === 404) throw err;
+      continue;
+    }
+    if (job.status === "error") throw new Error(job.error || "The AI couldn't answer. Please try again.");
+    if (job.status === "done") return job;
+  }
+  throw new Error("The AI is taking longer than usual. Please try again in a minute.");
+}
+
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,13 +109,14 @@ function ChatContent() {
     const now = new Date().toISOString();
     setMessages((m) => [...m, { id: "g-user-" + Date.now(), role: "USER", content, createdAt: now }]);
     try {
-      const res = await api<{ answer: string; sources: Message["sources"] }>("/api/chats/ask", {
+      const first = await api<JobResponse>("/api/chats/ask", {
         method: "POST",
         body: JSON.stringify({ content }),
       });
+      const res = await waitForJob(first, (jobId) => `/api/chats/ask/jobs/${jobId}`);
       setMessages((m) => [
         ...m,
-        { id: "g-ai-" + Date.now(), role: "ASSISTANT", content: res.answer, createdAt: new Date().toISOString(), sources: res.sources },
+        { id: "g-ai-" + Date.now(), role: "ASSISTANT", content: res.answer || "", createdAt: new Date().toISOString(), sources: res.sources },
       ]);
     } catch (err: any) {
       setMessages((m) => [
@@ -144,14 +178,17 @@ function ChatContent() {
     setMessages((m) => [...m, tempUser]);
 
     try {
-      const res = await api<{ message: Message; sources: Message["sources"] }>(`/api/chats/${id}/messages`, {
+      const first = await api<JobResponse>(`/api/chats/${id}/messages`, {
         method: "POST",
         body: JSON.stringify({ content }),
       });
+      const res = await waitForJob(first, (jobId) => `/api/chats/jobs/${jobId}`);
+      if (!res.message) throw new Error("The AI couldn't answer. Please try again.");
+      const answer = res.message;
       setMessages((m) => [
         ...m.filter((x) => x.id !== tempUser.id),
         { ...tempUser, id: "user-" + Date.now() },
-        { ...res.message, sources: res.sources },
+        { ...answer, sources: res.sources },
       ]);
       loadChats();
     } catch (err: any) {

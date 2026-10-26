@@ -94,8 +94,8 @@ export function chatConfig() {
 export type MailProvider = "resend" | "smtp" | "console";
 
 /**
- * Outgoing mail. MAIL_PROVIDER=resend|smtp|console. If unset we pick resend when
- * RESEND_API_KEY is present, smtp when SMTP_HOST is present, otherwise console
+ * Outgoing mail. Default is SMTP (MAIL_PROVIDER=smtp). If unset we pick smtp when
+ * SMTP_HOST is present, resend when RESEND_API_KEY is present, otherwise console
  * (the word is written to the server log so sign-up still works without mail).
  */
 export function mailConfig() {
@@ -104,7 +104,7 @@ export function mailConfig() {
   const smtpHost = env("SMTP_HOST");
   let provider = env("MAIL_PROVIDER").toLowerCase() as MailProvider | "";
   if (provider !== "resend" && provider !== "smtp" && provider !== "console") {
-    provider = resendKey ? "resend" : smtpHost ? "smtp" : "console";
+    provider = smtpHost ? "smtp" : resendKey ? "resend" : "console";
   }
   const smtpPort = Number(env("SMTP_PORT") || 587);
   const appUrl = (env("APP_URL") || env("FRONTEND_URL") || "http://localhost:3000").replace(/\/$/, "");

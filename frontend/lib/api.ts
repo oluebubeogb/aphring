@@ -40,12 +40,15 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
 
   const res = await fetch(path, { ...options, headers });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
+    const err = await res.json().catch(() => ({} as any));
     if (res.status === 401 && token) clearSession();
+    const gatewayTimeout = res.status === 502 || res.status === 504 || res.status === 408;
     const msg =
       err.error ||
       (Array.isArray(err.details) ? err.details.map((d: any) => d.message).join(", ") : "") ||
-      "Request failed";
+      (gatewayTimeout
+        ? "The AI took too long on the gateway. Wait a minute and ask again."
+        : res.statusText || "Request failed");
     throw new ApiError(msg, res.status);
   }
   return res.json();
