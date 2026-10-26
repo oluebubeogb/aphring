@@ -18,7 +18,6 @@ import oralRoutes from "./routes/oral.js";
 import exploreRoutes from "./routes/explore.js";
 import feedRoutes from "./routes/feed.js";
 import meRoutes from "./routes/me.js";
-import communityRoutes from "./routes/community.js";
 import { errorHandler } from "./middleware/error.js";
 import { ensureStorage } from "./services/storage.js";
 
@@ -57,9 +56,6 @@ app.use("/api/explore", exploreRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/me", meRoutes);
 app.use("/api", communityRoutes);
-// Old community pages are gone; Explore replaces them.
-app.use("/api/communities", (_req, res) => res.status(410).json({ error: "Communities were replaced by Explore" }));
-
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 app.use(errorHandler);
 
