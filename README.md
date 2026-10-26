@@ -46,12 +46,58 @@ Use a **new empty Postgres** (new Coolify project / new volume). This build ship
 | `DATABASE_URL` | local dev | Set automatically by compose. |
 | `RUNPOD_API_KEY`, `RUNPOD_BASE_URL`, `RUNPOD_MODEL` | no | Chat via OpenAI-compatible API (RunPod). Without them, Ask returns verified excerpts with no model call. Optional legacy: `RUNPOD_ENDPOINT_ID` for serverless `/runsync`. |
 | `EMBEDDING_API_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` | no | Semantic search. Records are embedded once, when verified. Without them, keyword search is used. |
+| `MAIL_PROVIDER` | no | `resend`, `smtp` or `console`. Empty = auto (Resend key → resend, `SMTP_HOST` → smtp, else console). Console prints the word in the backend log and sends nothing. |
+| `MAIL_FROM` | with mail | Sender, e.g. `Aphring <no-reply@aphring.ng>` (must be a verified domain on Resend). |
+| `APP_URL` | with mail | Public site URL used in email links (falls back to `FRONTEND_URL`). |
+| `RESEND_API_KEY` | resend | Resend API key. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` | smtp | Any SMTP server. `SMTP_SECURE=true` for port 465. |
 | `OPENAI_API_KEY` | no | Whisper transcription for oral uploads. Without it, contributors paste a transcript. |
 | `FRONTEND_URL` | no | CORS origin(s), only if browsers call the backend directly. |
 | `STORAGE_PATH` | no | Upload directory (compose: `/app/uploads`, a named volume). |
 | `ALLOW_FAKE_EMBEDDINGS` | dev only | Deterministic fake vectors for local testing; ignored in production. |
 | `PRISMA_LOG_QUERIES` | no | `true` to log every SQL query. |
 | `BACKEND_URL` | frontend build | Where Next.js proxies `/api`. **Read at build time** (compose passes `http://backend:4000`). |
+
+## Email words
+
+Email confirmation and password reset use **Nigerian words** instead of numeric codes — names, places,
+foods and animals such as `ikenna`, `kaduna`, `suya`. Emails show the word in lowercase; the site accepts
+any capitalisation (`Ikenna`, `ikenna`, `IKENNA`).
+
+- **Sign-up** sends one word (valid 30 min). Signup never fails because of mail; unconfirmed users see a reminder and can resend from `/verify-email`.
+- **Forgot password** (`/forgot-password`) sends two words (valid 20 min) — two words because one word out of ~350 is too easy to guess.
+- Only an HMAC of the word is stored, with expiry, 5 attempts per word, at most one email a minute and 5 an hour per account, plus IP limits.
+- Accounts that existed before this upgrade are treated as confirmed.
+
+## Ask without an account
+
+Anyone can use **Ask** at `/chat`. Guests get one-off answers (not saved, no history sidebar) with a strict
+per-IP limit (4 a minute, 15 an hour) and a prompt to sign in to save chats. Signed-in users keep saved
+chats and the 60/hour limit.
+
+Ask first does a keyword search over verified records (title, text, entity names and aliases; filler words
+like "tell me about" are ignored), then adds semantic matches if embeddings are configured. If nothing
+matches, it answers "no verified information" without calling the model. If the chat model fails, Ask
+shows the real reason (bad key, wrong model, timeout) instead of pretending nothing was found.
+
+## Documents, re-chunk and bulk review
+
+Uploaded documents are split into records by heading and topic. Each extract carries a short
+"About <subject> · <section>" line so it makes sense on its own (no orphaned "He was…" paragraphs).
+
+In the **Workstation**:
+
+- **Documents** tab → **Re-chunk** re-reads a stored file and splits it again with the current extractor.
+  By default the document's old *pending* drafts are retired ("Superseded by re-chunk"). Verified records are never changed.
+  **Review its records** opens the queue filtered to that document.
+- **Review queue** has checkboxes, **Select page**, **Select all from this document**, and a bulk bar:
+  **Verify selected** (asks for confirmation) and **Reject selected** (one shared reason required). Up to 100 at a time.
+
+## Leaderboard
+
+One general leaderboard for everybody, staff included, ranked by verified work, with milestones
+(First record → Contributor → Chronicler → Historian → Archivist of the people). It shows no roles, and
+public profiles show no role badges or review counts.
 
 ## Local development
 
@@ -72,5 +118,5 @@ Next.js 15 · Express · Prisma (migrations) · PostgreSQL + pgvector · local f
 - Each record is embedded once, on verification. Re-embedding happens only if its text changes. No embeddings are generated for pending content.
 - If no verified record matches a question, Ask replies "no verified information" without calling the model.
 - Without a chat model configured, Ask quotes the verified excerpts directly.
-- Chat is rate-limited to 60 messages per user per hour.
+- Chat is rate-limited to 60 messages per user per hour, and 15 per IP per hour for guests.
 - Entity suggestions in the Workstation are rule-based (honorifics, "… School", "… Party", known catalogue names), not AI.

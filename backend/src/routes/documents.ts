@@ -28,7 +28,7 @@ router.post("/", requireAuth, upload.single("file"), async (req: AuthRequest, re
     const { kind, mime } = detectDocument(originalname, buffer);
 
     const raw = await extractDocumentText(kind, buffer);
-    const drafts = splitIntoRecords(raw);
+    const drafts = splitIntoRecords(raw, { filename: originalname });
     if (drafts.length === 0) {
       return res.status(400).json({ error: "No readable text found. Scanned PDFs need OCR before upload." });
     }

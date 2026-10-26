@@ -23,7 +23,8 @@ export default function RegisterPage() {
         body: JSON.stringify({ ...form, username: form.username.toLowerCase() }),
       });
       setSession(res.token, res.user);
-      router.push("/explore");
+      // A one-word code has been emailed; confirm it next (can be skipped and done later from /verify-email).
+      router.push("/verify-email");
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -65,7 +66,7 @@ export default function RegisterPage() {
           </div>
           <div>
             <label className="block text-sm text-secondary mb-1.5">Password</label>
-            <input type="password" value={form.password} onChange={set("password")} required minLength={8} autoComplete="new-password" className={inputCls} />
+            <input type="password" value={form.password} onChange={set("password")} required minLength={8} maxLength={200} autoComplete="new-password" className={inputCls} />
           </div>
           <button type="submit" disabled={loading} className={`${btnPrimary} w-full h-11`}>
             {loading ? "Creating…" : "Create account"}

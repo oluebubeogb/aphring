@@ -73,6 +73,11 @@ enum CorrectionStatus {
   REJECTED
 }
 
+enum EmailPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
 enum CorrectionField {
   TITLE
   CONTENT
@@ -82,17 +87,19 @@ enum CorrectionField {
 }
 
 model User {
-  id         String   @id @default(cuid())
+  id              String    @id @default(cuid())
   /// Lower-case, unique handle. ADMIN_USERNAMES matches against this.
-  username   String   @unique
-  name       String
-  email      String   @unique
-  password   String
-  avatar     String?
-  role       Role     @default(USER)
-  reputation Int      @default(0)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  username        String    @unique
+  name            String
+  email           String    @unique
+  password        String
+  avatar          String?
+  role            Role      @default(USER)
+  reputation      Int       @default(0)
+  /// Set when the user confirms the word we emailed. Null = not yet verified.
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   knowledgeRecords    KnowledgeRecord[] @relation("CreatedBy")
   verifiedRecords     KnowledgeRecord[] @relation("VerifiedBy")
@@ -109,6 +116,7 @@ model User {
   affinities          UserAffinity[]
   saves               SavedRecord[]
   auditLogs           AuditLog[]
+  emailChallenges     EmailChallenge[]
 
   @@map("users")
 }
@@ -129,26 +137,26 @@ model ModInvite {
 }
 
 model KnowledgeRecord {
-  id              String          @id @default(cuid())
-  title           String
-  content         String
-  type            KnowledgeType
-  status          KnowledgeStatus @default(PENDING)
+  id           String                       @id @default(cuid())
+  title        String
+  content      String
+  type         KnowledgeType
+  status       KnowledgeStatus              @default(PENDING)
   /// Contributor's free-text place, stored raw. Normalised into a PLACE entity at review.
-  placeText       String?         @map("place_text")
-  embedding       Unsupported("vector(1536)")?
+  placeText    String?                      @map("place_text")
+  embedding    Unsupported("vector(1536)")?
   /// sha256(title + content) of the text that was last embedded. Skip re-embedding when unchanged.
-  embeddedHash    String?         @map("embedded_hash")
-  embeddedAt      DateTime?       @map("embedded_at")
-  sourceRank      Float           @default(0) @map("source_rank")
-  upvotes         Int             @default(0)
-  downvotes       Int             @default(0)
-  reviewNote      String?         @map("review_note")
-  createdById     String          @map("created_by")
-  verifiedById    String?         @map("verified_by")
-  verifiedAt      DateTime?       @map("verified_at")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  embeddedHash String?                      @map("embedded_hash")
+  embeddedAt   DateTime?                    @map("embedded_at")
+  sourceRank   Float                        @default(0) @map("source_rank")
+  upvotes      Int                          @default(0)
+  downvotes    Int                          @default(0)
+  reviewNote   String?                      @map("review_note")
+  createdById  String                       @map("created_by")
+  verifiedById String?                      @map("verified_by")
+  verifiedAt   DateTime?                    @map("verified_at")
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
 
   createdBy   User              @relation("CreatedBy", fields: [createdById], references: [id])
   verifiedBy  User?             @relation("VerifiedBy", fields: [verifiedById], references: [id])
@@ -396,4 +404,22 @@ model AudioUpload {
   uploadedBy User @relation(fields: [uploadedById], references: [id])
 
   @@map("audio_uploads")
+}
+
+/// One emailed verification word (email confirmation or password reset).
+/// Only an HMAC of the normalised lowercase word is stored.
+model EmailChallenge {
+  id         String       @id @default(cuid())
+  userId     String       @map("user_id")
+  purpose    EmailPurpose
+  codeHash   String       @map("code_hash")
+  attempts   Int          @default(0)
+  expiresAt  DateTime     @map("expires_at")
+  consumedAt DateTime?    @map("consumed_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt])
+  @@map("email_challenges")
 }

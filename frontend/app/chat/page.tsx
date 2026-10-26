@@ -35,22 +35,22 @@ function ChatContent() {
   const initialQ = searchParams.get("q");
   const startedRef = useRef(false);
   const [staff, setStaff] = useState(false);
+  // null = not known yet (first render), true = signed out visitor asking without an account.
+  const [guest, setGuest] = useState<boolean | null>(null);
   useEffect(() => setStaff(isStaff(getStoredUser())), []);
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      router.push("/login");
-      return;
-    }
-    loadChats();
+    const signedIn = isLoggedIn();
+    setGuest(!signedIn);
+    if (signedIn) loadChats();
   }, []);
 
   useEffect(() => {
-    if (initialQ && isLoggedIn() && !startedRef.current) {
-      startedRef.current = true;
-      startWithQuestion(initialQ);
-    }
-  }, [initialQ]);
+    if (guest === null || !initialQ || startedRef.current) return;
+    startedRef.current = true;
+    if (guest) sendGuest(initialQ);
+    else startWithQuestion(initialQ);
+  }, [initialQ, guest]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,8 +61,36 @@ function ChatContent() {
       const data = await api<Chat[]>("/api/chats");
       setChats(data);
     } catch {
+      // Session expired: fall back to guest mode instead of bouncing to the login page.
       clearToken();
-      router.push("/login");
+      setGuest(true);
+    }
+  }
+
+  /** Signed-out Ask: one-off answers, kept only in this tab (nothing is saved on the server). */
+  async function sendGuest(text?: string) {
+    const content = (text ?? input).trim();
+    if (!content || loading) return;
+    setInput("");
+    setLoading(true);
+    const now = new Date().toISOString();
+    setMessages((m) => [...m, { id: "g-user-" + Date.now(), role: "USER", content, createdAt: now }]);
+    try {
+      const res = await api<{ answer: string; sources: Message["sources"] }>("/api/chats/ask", {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+      setMessages((m) => [
+        ...m,
+        { id: "g-ai-" + Date.now(), role: "ASSISTANT", content: res.answer, createdAt: new Date().toISOString(), sources: res.sources },
+      ]);
+    } catch (err: any) {
+      setMessages((m) => [
+        ...m,
+        { id: "g-err-" + Date.now(), role: "ASSISTANT", content: err.message || "Something went wrong.", createdAt: new Date().toISOString() },
+      ]);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -91,6 +119,7 @@ function ChatContent() {
   }
 
   async function sendMessage(text?: string, chatId?: string) {
+    if (guest) return sendGuest(text);
     const content = (text ?? input).trim();
     let id = chatId || activeChat;
 
@@ -142,7 +171,8 @@ function ChatContent() {
 
   return (
     <div className="h-screen flex bg-background">
-      {/* Sidebar */}
+      {/* Sidebar (signed-in only: guests have no saved history) */}
+      {guest === false && (
       <aside
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -226,21 +256,34 @@ function ChatContent() {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-border flex items-center px-4 gap-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden text-secondary"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <span className="text-sm text-secondary truncate">
-            {activeChat
+          {guest ? (
+            <Link href="/" className="font-semibold tracking-tight">
+              aphring
+            </Link>
+          ) : (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden text-secondary"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+          <span className="text-sm text-secondary truncate flex-1">
+            {guest ? "Ask as a guest" : activeChat
               ? chats.find((c) => c.id === activeChat)?.title || "Chat"
               : "New conversation"}
           </span>
+          {guest && (
+            <div className="flex items-center gap-3 text-sm">
+              <Link href="/explore" className="text-secondary hover:text-primary">Explore</Link>
+              <Link href="/login?next=/chat" className="px-3 py-1.5 rounded-lg bg-accent text-background">Sign in</Link>
+            </div>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
@@ -299,6 +342,13 @@ function ChatContent() {
         </div>
 
         <div className="border-t border-border p-4">
+          {guest && (
+            <p className="max-w-2xl mx-auto mb-3 text-xs text-secondary">
+              You&apos;re asking as a guest — answers aren&apos;t saved and there&apos;s a small hourly limit.{" "}
+              <Link href="/login?next=/chat" className="underline hover:text-primary">Sign in</Link> or{" "}
+              <Link href="/register" className="underline hover:text-primary">create an account</Link> to save your chats.
+            </p>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();

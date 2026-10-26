@@ -7,10 +7,9 @@ import { api } from "@/lib/api";
 import { Notice, Page, Tabs } from "@/components/ui";
 
 interface Row {
-  id: string;
   username: string;
   name: string;
-  role: string;
+  milestone: string | null;
   records: number;
   words: number;
   ups: number;
@@ -26,6 +25,7 @@ function Table({ rows }: { rows: Row[] }) {
           <tr>
             <th className="px-3 py-2 w-10">#</th>
             <th className="px-3 py-2">Contributor</th>
+            <th className="px-3 py-2 hidden sm:table-cell">Milestone</th>
             <th className="px-3 py-2 text-right">Records</th>
             <th className="px-3 py-2 text-right">Words</th>
             <th className="px-3 py-2 text-right">Upvotes</th>
@@ -34,13 +34,14 @@ function Table({ rows }: { rows: Row[] }) {
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.id} className="border-t border-border">
+            <tr key={r.username} className="border-t border-border">
               <td className="px-3 py-2 text-secondary">{i + 1}</td>
               <td className="px-3 py-2">
                 <Link href={`/u/${r.username}`} className="hover:underline">
                   {r.name} <span className="text-secondary">@{r.username}</span>
                 </Link>
               </td>
+              <td className="px-3 py-2 hidden sm:table-cell text-secondary">{r.milestone || "—"}</td>
               <td className="px-3 py-2 text-right">{r.records}</td>
               <td className="px-3 py-2 text-right">{r.words.toLocaleString()}</td>
               <td className="px-3 py-2 text-right">{r.ups}</td>
@@ -55,7 +56,7 @@ function Table({ rows }: { rows: Row[] }) {
 
 export default function LeaderboardPage() {
   const [period, setPeriod] = useState<"all" | "month">("all");
-  const [data, setData] = useState<{ contributors: Row[]; staff: Row[] } | null>(null);
+  const [data, setData] = useState<{ contributors: Row[]; milestones?: { min: number; name: string }[] } | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     api(`/api/leaderboard?period=${period}`)
@@ -78,16 +79,17 @@ export default function LeaderboardPage() {
         />
         <div className="mt-6 space-y-8">
           {error && <Notice kind="error">{error}</Notice>}
-          {data && (
-            <>
-              <Table rows={data.contributors} />
-              {data.staff.length > 0 && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-3">Moderators &amp; admins</h2>
-                  <Table rows={data.staff} />
-                </div>
-              )}
-            </>
+          {data && <Table rows={data.contributors} />}
+          {data?.milestones && (
+            <p className="text-xs text-secondary">
+              Milestones:{" "}
+              {data.milestones.map((m, i) => (
+                <span key={m.name}>
+                  {i > 0 && " · "}
+                  {m.name} ({m.min}+ verified)
+                </span>
+              ))}
+            </p>
           )}
         </div>
       </Page>

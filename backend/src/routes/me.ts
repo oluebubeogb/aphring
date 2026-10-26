@@ -15,7 +15,7 @@ router.get("/profile", async (req: AuthRequest, res, next) => {
   try {
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: req.user!.id },
-      select: { id: true, username: true, name: true, email: true, role: true, reputation: true, createdAt: true },
+      select: { id: true, username: true, name: true, email: true, role: true, reputation: true, createdAt: true, emailVerifiedAt: true },
     });
     const stats = await getUserStats(user.id);
     const counts = await prisma.knowledgeRecord.groupBy({

@@ -46,6 +46,23 @@ export async function getUserStats(userId: string): Promise<UserStats> {
   };
 }
 
+/** Public view of stats: drops staff-only signals (review counts would reveal who moderates). */
+export function publicStats(stats: UserStats): Omit<UserStats, "reviewsDone"> {
+  const { reviewsDone: _hidden, ...rest } = stats;
+  return rest;
+}
+
+const RECORD_LADDER = LADDERS.find((l) => l.key === "verifiedRecords")!;
+
+/** Role-neutral milestones for the leaderboard (same names as the verified-records badges). */
+export const RECORD_MILESTONES = RECORD_LADDER.steps.map((min, i) => ({ min, name: RECORD_LADDER.names[i] }));
+
+export function recordMilestone(records: number): string | null {
+  let name: string | null = null;
+  for (const m of RECORD_MILESTONES) if (records >= m.min) name = m.name;
+  return name;
+}
+
 export function deriveBadges(stats: UserStats, role: string) {
   const badges: { id: string; name: string; description: string }[] = [];
   if (role === "ADMIN") badges.push({ id: "role-admin", name: "Admin", description: "Runs Aphring" });

@@ -34,6 +34,10 @@ export function getFileStream(objectName: string) {
   return createReadStream(resolveKey(objectName));
 }
 
+export async function readStoredFile(objectName: string): Promise<Buffer> {
+  return fs.readFile(resolveKey(objectName));
+}
+
 export async function clearStorage() {
   for (const folder of ["documents", "audio"]) {
     const dir = path.join(STORAGE_PATH, folder);

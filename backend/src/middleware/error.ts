@@ -3,7 +3,8 @@ import { ZodError } from "zod";
 import multer from "multer";
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  /** expose=true: show the message even for 5xx in production (e.g. "AI service unavailable"). */
+  constructor(public status: number, message: string, public expose = false) {
     super(message);
   }
 }
@@ -20,6 +21,6 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
   const status = err.status || 500;
   if (status >= 500) console.error(err);
   res.status(status).json({
-    error: status >= 500 && process.env.NODE_ENV === "production" ? "Internal server error" : err.message || "Internal server error",
+    error: status >= 500 && process.env.NODE_ENV === "production" && !err.expose ? "Internal server error" : err.message || "Internal server error",
   });
 }

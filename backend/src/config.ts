@@ -91,6 +91,38 @@ export function chatConfig() {
   };
 }
 
+export type MailProvider = "resend" | "smtp" | "console";
+
+/**
+ * Outgoing mail. MAIL_PROVIDER=resend|smtp|console. If unset we pick resend when
+ * RESEND_API_KEY is present, smtp when SMTP_HOST is present, otherwise console
+ * (the word is written to the server log so sign-up still works without mail).
+ */
+export function mailConfig() {
+  const env = (k: string) => (process.env[k] || "").trim();
+  const resendKey = env("RESEND_API_KEY");
+  const smtpHost = env("SMTP_HOST");
+  let provider = env("MAIL_PROVIDER").toLowerCase() as MailProvider | "";
+  if (provider !== "resend" && provider !== "smtp" && provider !== "console") {
+    provider = resendKey ? "resend" : smtpHost ? "smtp" : "console";
+  }
+  const smtpPort = Number(env("SMTP_PORT") || 587);
+  const appUrl = (env("APP_URL") || env("FRONTEND_URL") || "http://localhost:3000").replace(/\/$/, "");
+  return {
+    provider: provider as MailProvider,
+    from: env("MAIL_FROM") || "Aphring <no-reply@aphring.local>",
+    resendKey,
+    smtp: {
+      host: smtpHost,
+      port: smtpPort,
+      secure: env("SMTP_SECURE") ? env("SMTP_SECURE") === "true" : smtpPort === 465,
+      user: env("SMTP_USER"),
+      pass: env("SMTP_PASS"),
+    },
+    appUrl,
+  };
+}
+
 export function validateStartupConfig() {
   getJwtSecret();
   const emb = embeddingConfig();
@@ -103,6 +135,14 @@ export function validateStartupConfig() {
   }
   if (getAdminUsernames().size === 0) {
     console.warn("[config] ADMIN_USERNAMES is empty — nobody will have admin access.");
+  }
+  const mail = mailConfig();
+  if (mail.provider === "console") {
+    console.warn("[config] MAIL_PROVIDER=console — verification words are written to this log, not emailed.");
+  } else if (mail.provider === "resend" && !mail.resendKey) {
+    console.warn("[config] MAIL_PROVIDER=resend but RESEND_API_KEY is empty — emails will fail.");
+  } else if (mail.provider === "smtp" && !mail.smtp.host) {
+    console.warn("[config] MAIL_PROVIDER=smtp but SMTP_HOST is empty — emails will fail.");
   }
   const chat = chatConfig();
   if (!chat.configured) {

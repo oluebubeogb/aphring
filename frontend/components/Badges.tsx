@@ -19,18 +19,19 @@ export interface Stats {
   verifiedFiles: number;
   upvotesReceived: number;
   acceptedCorrections: number;
-  reviewsDone: number;
+  /** Only present on your own profile (/api/me) — hidden publicly. */
+  reviewsDone?: number;
 }
 
 export function StatsGrid({ stats }: { stats: Stats }) {
-  const items = [
+  const items: [string, number][] = [
     ["Verified records", stats.verifiedRecords],
     ["Verified words", stats.verifiedWords],
     ["Verified files", stats.verifiedFiles],
     ["Upvotes received", stats.upvotesReceived],
     ["Accepted corrections", stats.acceptedCorrections],
-    ["Reviews done", stats.reviewsDone],
-  ] as const;
+  ];
+  if (typeof stats.reviewsDone === "number") items.push(["Reviews done", stats.reviewsDone]);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {items.map(([label, v]) => (

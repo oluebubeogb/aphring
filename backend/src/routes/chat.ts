@@ -2,11 +2,47 @@ import { Router } from "express";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { prisma } from "../services/prisma.js";
-import { requireAuth, AuthRequest } from "../middleware/auth.js";
+import { requireAuth, optionalAuth, AuthRequest } from "../middleware/auth.js";
 import { retrieveContext, generateAnswer } from "../services/ai.js";
 import { bumpFromRecords, SIGNAL_WEIGHTS, track } from "../services/affinity.js";
 
 const router = Router();
+
+/**
+ * Public Ask — works logged out. Nothing is stored (no chat, no messages, no affinity).
+ * Strict per-IP limits keep AI cost bounded; signed-in users should use /api/chats/:id/messages.
+ */
+const guestBurstLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 4,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "You're asking quickly — wait a minute and try again." },
+});
+const guestHourlyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: (req) => ((req as AuthRequest).user ? 60 : 15),
+  keyGenerator: (req) => (req as AuthRequest).user?.id || req.ip || "anon",
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Guest question limit reached for this hour. Sign in to keep asking and save your chats." },
+});
+
+router.post("/ask", optionalAuth, guestBurstLimiter, guestHourlyLimiter, async (req: AuthRequest, res, next) => {
+  try {
+    const { content } = z.object({ content: z.string().trim().min(1).max(1000) }).parse(req.body);
+    const sources = await retrieveContext(content);
+    const { answer, sources: used } = await generateAnswer(content, sources);
+    res.json({
+      answer,
+      sources: used.map((s) => ({ id: s.id, title: s.title, type: s.type })),
+      saved: false,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.use(requireAuth);
 
 const chatLimiter = rateLimit({

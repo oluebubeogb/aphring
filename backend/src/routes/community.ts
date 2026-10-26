@@ -3,20 +3,23 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../services/prisma.js";
 import { optionalAuth, requireAuth, AuthRequest } from "../middleware/auth.js";
-import { getUserStats, deriveBadges } from "../services/badges.js";
+import { getUserStats, deriveBadges, publicStats, recordMilestone, RECORD_MILESTONES } from "../services/badges.js";
 import { HttpError } from "../middleware/error.js";
 
 const router = Router();
 
-/** Leaderboard from VERIFIED work. Staff are listed separately so reviewers don't top their own board. */
+/**
+ * One general leaderboard from VERIFIED work. Everyone is ranked together, including
+ * moderators and admins, and the response never says who is staff.
+ */
 router.get("/leaderboard", async (req, res, next) => {
   try {
     const period = z.enum(["all", "month"]).default("all").parse(req.query.period);
     const since = period === "month" ? new Date(Date.now() - 30 * 86_400_000) : new Date(0);
     const rows = await prisma.$queryRawUnsafe<
-      Array<{ id: string; username: string; name: string; role: string; records: number; words: number; ups: number }>
+      Array<{ id: string; username: string; name: string; records: number; words: number; ups: number }>
     >(
-      `SELECT u.id, u.username, u.name, u.role::text AS role,
+      `SELECT u.id, u.username, u.name,
               COUNT(kr.id)::int AS records,
               COALESCE(SUM(array_length(regexp_split_to_array(trim(kr.content), '\\s+'), 1)), 0)::int AS words,
               COALESCE(SUM(kr.upvotes), 0)::int AS ups
@@ -24,15 +27,22 @@ router.get("/leaderboard", async (req, res, next) => {
        JOIN knowledge_records kr ON kr.created_by = u.id AND kr.status = 'VERIFIED' AND kr.verified_at >= $1
        GROUP BY u.id
        ORDER BY records DESC, ups DESC
-       LIMIT 100`,
+       LIMIT 200`,
       since
     );
-    const board = rows.map((r) => ({ ...r, score: r.records * 5 + r.ups }));
-    res.json({
-      period,
-      contributors: board.filter((r) => r.role === "USER").sort((a, b) => b.score - a.score).slice(0, 50),
-      staff: board.filter((r) => r.role !== "USER").sort((a, b) => b.score - a.score).slice(0, 20),
-    });
+    const contributors = rows
+      .map((r) => ({
+        username: r.username,
+        name: r.name,
+        records: r.records,
+        words: r.words,
+        ups: r.ups,
+        score: r.records * 5 + r.ups,
+        milestone: recordMilestone(r.records),
+      }))
+      .sort((a, b) => b.score - a.score || b.records - a.records)
+      .slice(0, 100);
+    res.json({ period, contributors, milestones: RECORD_MILESTONES });
   } catch (err) {
     next(err);
   }
@@ -42,7 +52,7 @@ router.get("/users/:username", async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { username: String(req.params.username).toLowerCase() },
-      select: { id: true, username: true, name: true, role: true, reputation: true, createdAt: true },
+      select: { id: true, username: true, name: true, reputation: true, createdAt: true },
     });
     if (!user) return res.status(404).json({ error: "User not found" });
     const stats = await getUserStats(user.id);
@@ -53,7 +63,8 @@ router.get("/users/:username", async (req, res, next) => {
       select: { id: true, title: true, type: true, placeText: true, upvotes: true, verifiedAt: true },
     });
     const { id, ...pub } = user;
-    res.json({ user: pub, stats, ...deriveBadges(stats, user.role), recent });
+    // Public profiles never reveal staff roles (own role is visible on /api/me only).
+    res.json({ user: pub, stats: publicStats(stats), ...deriveBadges(stats, "USER"), recent });
   } catch (err) {
     next(err);
   }

@@ -127,6 +127,17 @@ export default function Header() {
           </button>
         </div>
       )}
+      {user && user.emailVerified === false && (
+        <div className="border-t border-border bg-surface text-xs text-secondary">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-1.5">
+            Please confirm your email —{" "}
+            <Link href="/verify-email" className="underline text-primary">
+              enter your word
+            </Link>
+            .
+          </div>
+        </div>
+      )}
     </header>
   );
 }

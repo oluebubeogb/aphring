@@ -9,7 +9,7 @@ import { api, timeAgo } from "@/lib/api";
 import { Notice, Page } from "@/components/ui";
 
 interface PublicProfile {
-  user: { username: string; name: string; role: string; reputation: number; createdAt: string };
+  user: { username: string; name: string; reputation: number; createdAt: string };
   stats: Stats;
   badges: Badge[];
   milestones: Milestone[];
@@ -35,7 +35,7 @@ export default function UserPage() {
             <div>
               <h1 className="text-3xl font-semibold tracking-tight">{p.user.name}</h1>
               <p className="text-secondary text-sm">
-                @{p.user.username} · {p.user.role.toLowerCase()} · reputation {p.user.reputation} · joined {timeAgo(p.user.createdAt)}
+                @{p.user.username} · reputation {p.user.reputation} · joined {timeAgo(p.user.createdAt)}
               </p>
             </div>
             <StatsGrid stats={p.stats} />

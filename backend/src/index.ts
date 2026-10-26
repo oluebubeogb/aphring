@@ -58,9 +58,7 @@ app.use("/api/feed", feedRoutes);
 app.use("/api/me", meRoutes);
 app.use("/api", communityRoutes);
 // Old community pages are gone; Explore replaces them.
-app.use("/api/communities", (_req, res) =>
-  res.status(410).json({ error: "Communities were replaced by Explore" })
-);
+app.use("/api/communities", (_req, res) => res.status(410).json({ error: "Communities were replaced by Explore" }));
 
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 app.use(errorHandler);

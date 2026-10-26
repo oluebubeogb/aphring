@@ -18,6 +18,8 @@ export interface ReviewInput {
   /** Normalised place name. `null` clears it. Omitted keeps contributor's free text. */
   place?: string | null;
   entities?: { name: string; type: EntityType }[];
+  /** Bulk review embeds the whole batch once at the end. */
+  skipEmbed?: boolean;
 }
 
 export async function recomputeSourceRank(tx: Prisma.TransactionClient, recordId: string) {
@@ -120,6 +122,6 @@ export async function reviewRecord(input: ReviewInput) {
   });
 
   // Embed on verify — never at draft time. Skips if text hash unchanged.
-  if (status === "VERIFIED") await embedRecords([record.id]);
+  if (status === "VERIFIED" && !input.skipEmbed) await embedRecords([record.id]);
   return record;
 }

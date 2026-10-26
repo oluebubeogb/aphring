@@ -121,3 +121,14 @@ deferrals are listed at the end.
 - Notifications for "your record was verified/rejected" are not built. Contributors see status and the moderator's note on `/me`.
 - `trust proxy` is set to 1 hop. If you put another proxy in front of Coolify's, raise it so rate limits key on the real client IP.
 - The frontend's `BACKEND_URL` is baked in at build time (Next.js rewrites). Compose already passes it as a build arg.
+
+## Upgrade: Ask fix, smarter chunking, bulk review, public Ask, email words
+
+- **Ask retrieval fixed.** Keyword search now ignores question filler ("tell me about"), matches whole words across title, text and entity names/aliases, and ranks records titled with the asked name first. Model failures surface as a clear 502 message instead of a false "no verified information".
+- **Smarter chunking.** Documents are split by headings and topic, with a subject line on every extract; the extractor caps a document at 25 extracts by growing them, not by truncating.
+- **Re-chunk** (Workstation → Documents) re-splits a stored file; old pending drafts can be retired; verified records are untouched.
+- **Bulk review**: multi-select, select page, select everything from the same document, verify with confirmation, reject with one shared reason (max 100 per action; embeddings batched afterwards).
+- **Public Ask**: `POST /api/chats/ask` works without an account (strict per-IP limits, nothing saved).
+- **Leaderboard**: one general board including staff; no roles in the leaderboard or public profiles.
+- **Email**: `MAIL_PROVIDER=resend|smtp|console`; Nigerian-word codes for email confirmation and password reset (hashed, expiring, rate-limited). Migration `0002_email_challenges` marks existing users as confirmed.
+- Known limitation: a password reset does not sign out existing sessions (JWTs are stateless and expire on their own).

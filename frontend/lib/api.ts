@@ -12,6 +12,8 @@ export interface SessionUser {
   email?: string;
   role: Role;
   reputation: number;
+  /** false until the user confirms their email word (absent on very old sessions). */
+  emailVerified?: boolean;
 }
 
 const TOKEN_KEY = "aphring_token";

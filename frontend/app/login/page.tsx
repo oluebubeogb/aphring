@@ -49,7 +49,12 @@ function LoginForm() {
             <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete="username" className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Password</label>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <label className="block text-sm text-secondary">Password</label>
+              <Link href="/forgot-password" className="text-xs text-secondary hover:text-primary underline underline-offset-2">
+                Forgot password?
+              </Link>
+            </div>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className={inputCls} />
           </div>
           <button type="submit" disabled={loading} className={`${btnPrimary} w-full h-11`}>

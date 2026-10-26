@@ -8,7 +8,7 @@ import Header, { useSession } from "@/components/Header";
 import { api, downloadFile, ENTITY_TYPES, isLoggedIn, isStaff, KNOWLEDGE_TYPES, timeAgo } from "@/lib/api";
 import { btnGhost, btnPrimary, inputCls, Notice, Page, StatusPill, Tabs, textareaCls } from "@/components/ui";
 
-type Tab = "queue" | "corrections" | "reports" | "entities" | "people" | "ops";
+type Tab = "queue" | "documents" | "corrections" | "reports" | "entities" | "people" | "ops";
 type EntityDraft = { name: string; type: string; reason?: string; existingId?: string };
 
 interface StaffRecord {
@@ -183,25 +183,118 @@ function ReviewPanel({ record, onDone }: { record: StaffRecord; onDone: (msg: st
   );
 }
 
-function QueueTab({ flash }: { flash: (m: string) => void }) {
+type DocFilter = { id: string; filename: string } | null;
+
+function QueueTab({ flash, docFilter, clearDocFilter }: { flash: (m: string) => void; docFilter: DocFilter; clearDocFilter: () => void }) {
   const [status, setStatus] = useState("PENDING");
   const [q, setQ] = useState("");
-  const [data, setData] = useState<{ total: number; records: StaffRecord[] } | null>(null);
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<{ total: number; page: number; records: StaffRecord[] } | null>(null);
   const [selected, setSelected] = useState<StaffRecord | null>(null);
+  // Bulk selection (ids can span pages, up to 100 at a time — the backend limit).
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkReason, setBulkReason] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+  const PAGE_SIZE = 25;
+  const MAX_BULK = 100;
 
   const load = useCallback(() => {
-    api(`/api/workstation/queue?status=${status}${q ? `&q=${encodeURIComponent(q)}` : ""}`)
+    const params = new URLSearchParams({ status, page: String(page) });
+    if (q) params.set("q", q);
+    if (docFilter) params.set("documentId", docFilter.id);
+    api(`/api/workstation/queue?${params}`)
       .then((d) => {
         setData(d);
         setSelected((s) => (s ? d.records.find((r: StaffRecord) => r.id === s.id) || d.records[0] || null : d.records[0] || null));
       })
       .catch((e) => flash(e.message));
-  }, [status, q, flash]);
-  useEffect(load, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, q, page, docFilter, flash]);
+  useEffect(load, [status, page, docFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setChecked(new Set());
+    setPage(1);
+  }, [status, docFilter]);
+
+  const records = data?.records ?? [];
+  const pages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+  const allOnPage = records.length > 0 && records.every((r) => checked.has(r.id));
+  const canBulk = status === "PENDING" || status === "REJECTED" || status === "VERIFIED";
+
+  function toggle(id: string) {
+    setChecked((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < MAX_BULK) next.add(id);
+      return next;
+    });
+  }
+  function togglePage() {
+    setChecked((cur) => {
+      const next = new Set(cur);
+      if (allOnPage) records.forEach((r) => next.delete(r.id));
+      else for (const r of records) if (next.size < MAX_BULK) next.add(r.id);
+      return next;
+    });
+  }
+  async function selectSameDocument() {
+    const doc = selected?.citations.find((c) => c.document)?.document;
+    if (!doc) return flash("This record has no source document.");
+    try {
+      const res = await api<{ ids: string[] }>(`/api/workstation/documents/${doc.id}/record-ids?status=${status}`);
+      setChecked((cur) => {
+        const next = new Set(cur);
+        for (const id of res.ids) if (next.size < MAX_BULK) next.add(id);
+        return next;
+      });
+      flash(`Selected ${res.ids.length} ${status.toLowerCase()} record(s) from ${doc.filename}.`);
+    } catch (e: any) {
+      flash(e.message);
+    }
+  }
+
+  async function bulk(decision: "VERIFY" | "REJECT") {
+    setBulkError("");
+    const ids = [...checked];
+    if (!ids.length) return;
+    const reason = bulkReason.trim();
+    if (decision === "REJECT" && !reason) return setBulkError("Write one reason — it is sent to every contributor whose record is rejected.");
+    const ok = window.confirm(
+      decision === "VERIFY"
+        ? `Verify and publish ${ids.length} record(s)? They'll appear on Explore and in Ask answers straight away. Each keeps its suggested index entries; open a record on its own if it needs edits first.`
+        : `Reject ${ids.length} record(s) with this reason?\n\n“${reason}”`
+    );
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      const res = await api<{ ok: number; failed: { id: string; error: string }[] }>("/api/workstation/records/bulk-review", {
+        method: "POST",
+        body: JSON.stringify({ ids, decision, reason: reason || undefined }),
+      });
+      const verb = decision === "VERIFY" ? "verified" : "rejected";
+      flash(res.failed.length ? `${res.ok} ${verb}, ${res.failed.length} failed: ${res.failed[0].error}` : `${res.ok} record(s) ${verb}.`);
+      setChecked(new Set(res.failed.map((f) => f.id)));
+      setBulkReason("");
+      setSelected(null);
+      load();
+    } catch (e: any) {
+      setBulkError(e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   return (
-    <div className="grid lg:grid-cols-[320px_1fr] gap-6">
+    <div className="grid lg:grid-cols-[340px_1fr] gap-6">
       <div className="space-y-3">
+        {docFilter && (
+          <div className="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-accent/40 bg-surface">
+            <span className="truncate">From document: <strong>{docFilter.filename}</strong></span>
+            <button onClick={clearDocFilter} className="text-secondary hover:text-primary" aria-label="Clear document filter">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 px-2 rounded-lg border border-border bg-surface text-sm">
             {["PENDING", "VERIFIED", "REJECTED"].map((s) => (
@@ -212,19 +305,75 @@ function QueueTab({ flash }: { flash: (m: string) => void }) {
             className="flex-1"
             onSubmit={(e) => {
               e.preventDefault();
-              load();
+              if (page !== 1) setPage(1);
+              else load();
             }}
           >
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="w-full h-9 px-3 rounded-lg border border-border bg-surface text-sm" />
           </form>
         </div>
-        <p className="text-xs text-secondary">{data?.total ?? 0} record(s)</p>
-        <ul className="space-y-1 max-h-[70vh] overflow-y-auto">
-          {data?.records.map((r) => (
-            <li key={r.id}>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary">
+          <span>{data?.total ?? 0} record(s)</span>
+          {canBulk && records.length > 0 && (
+            <>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={allOnPage} onChange={togglePage} /> Select page
+              </label>
+              {selected?.citations.some((c) => c.document) && (
+                <button onClick={selectSameDocument} className="underline hover:text-primary">
+                  Select all from this document
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {checked.size > 0 && (
+          <div className="p-3 rounded-xl border border-accent/40 bg-surface space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">{checked.size} selected{checked.size >= MAX_BULK ? " (max 100)" : ""}</span>
+              <button onClick={() => setChecked(new Set())} className="text-xs text-secondary hover:text-primary">
+                Clear
+              </button>
+            </div>
+            <input
+              value={bulkReason}
+              onChange={(e) => setBulkReason(e.target.value)}
+              placeholder="Shared note (required to reject)"
+              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm"
+            />
+            {bulkError && <Notice kind="error">{bulkError}</Notice>}
+            <div className="flex gap-2">
+              {status !== "VERIFIED" && (
+                <button disabled={bulkBusy} onClick={() => bulk("VERIFY")} className={`${btnPrimary} h-9 flex-1`}>
+                  {bulkBusy ? "Working…" : "Verify selected"}
+                </button>
+              )}
+              {status !== "REJECTED" && (
+                <button disabled={bulkBusy} onClick={() => bulk("REJECT")} className={`${btnGhost} flex-1`}>
+                  Reject selected
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <ul className="space-y-1 max-h-[65vh] overflow-y-auto">
+          {records.map((r) => (
+            <li key={r.id} className="flex items-stretch gap-2">
+              {canBulk && (
+                <input
+                  type="checkbox"
+                  checked={checked.has(r.id)}
+                  onChange={() => toggle(r.id)}
+                  className="mt-3.5 shrink-0"
+                  aria-label={`Select ${r.title}`}
+                />
+              )}
               <button
                 onClick={() => setSelected(r)}
-                className={`w-full text-left p-3 rounded-lg border text-sm ${selected?.id === r.id ? "border-accent bg-surface" : "border-border hover:bg-surface"}`}
+                className={`flex-1 min-w-0 text-left p-3 rounded-lg border text-sm ${selected?.id === r.id ? "border-accent bg-surface" : "border-border hover:bg-surface"}`}
               >
                 <p className="truncate font-medium">{r.title}</p>
                 <p className="text-xs text-secondary truncate">
@@ -234,6 +383,19 @@ function QueueTab({ flash }: { flash: (m: string) => void }) {
             </li>
           ))}
         </ul>
+        {pages > 1 && (
+          <div className="flex items-center justify-between text-xs text-secondary">
+            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className={btnGhost}>
+              Previous
+            </button>
+            <span>
+              Page {page} of {pages}
+            </span>
+            <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className={btnGhost}>
+              Next
+            </button>
+          </div>
+        )}
       </div>
       <div>
         {selected ? (
@@ -242,6 +404,11 @@ function QueueTab({ flash }: { flash: (m: string) => void }) {
             record={selected}
             onDone={(m) => {
               flash(m);
+              setChecked((cur) => {
+                const next = new Set(cur);
+                next.delete(selected.id);
+                return next;
+              });
               setSelected(null);
               load();
             }}
@@ -250,6 +417,119 @@ function QueueTab({ flash }: { flash: (m: string) => void }) {
           <Notice>Queue is clear.</Notice>
         )}
       </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ Documents (re-chunk)
+
+interface StaffDocument {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  placeText: string | null;
+  createdAt: string;
+  uploadedBy: { username: string } | null;
+  counts: Record<string, number>;
+}
+
+function DocumentsTab({ flash, openQueue }: { flash: (m: string) => void; openQueue: (d: { id: string; filename: string }) => void }) {
+  const [q, setQ] = useState("");
+  const [docs, setDocs] = useState<StaffDocument[] | null>(null);
+  const [supersede, setSupersede] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, string>>({});
+
+  const load = useCallback(() => {
+    api<StaffDocument[]>(`/api/workstation/documents${q ? `?q=${encodeURIComponent(q)}` : ""}`)
+      .then(setDocs)
+      .catch((e) => flash(e.message));
+  }, [q, flash]);
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function rechunk(d: StaffDocument) {
+    const sup = supersede[d.id] ?? true;
+    const ok = window.confirm(
+      `Re-split “${d.filename}” with the current extractor?\n\n` +
+        `New pending drafts will be created${sup ? " and the document's current pending drafts will be retired (marked rejected: “Superseded by re-chunk”)" : ""}. ` +
+        `Verified records are never touched.`
+    );
+    if (!ok) return;
+    setBusy(d.id);
+    try {
+      const res = await api<{ created: number; message: string }>(`/api/workstation/documents/${d.id}/rechunk`, {
+        method: "POST",
+        body: JSON.stringify({ supersedePending: sup }),
+      });
+      setResults((r) => ({ ...r, [d.id]: res.message }));
+      flash(res.message);
+      load();
+    } catch (e: any) {
+      setResults((r) => ({ ...r, [d.id]: e.message }));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-secondary">
+        Uploaded source files. <strong>Re-chunk</strong> re-reads the stored file and splits it again with the smarter extractor (headings, subject
+        context, no orphaned “He…” paragraphs). Use it on documents uploaded before this upgrade, then review the new drafts in bulk.
+      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          load();
+        }}
+      >
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by filename" className={inputCls} />
+      </form>
+      {docs === null ? (
+        <p className="text-sm text-secondary">Loading…</p>
+      ) : docs.length === 0 ? (
+        <Notice>No documents found.</Notice>
+      ) : (
+        <ul className="space-y-3">
+          {docs.map((d) => (
+            <li key={d.id} className="p-4 rounded-xl border border-border bg-surface space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <button className="font-medium underline-offset-2 hover:underline text-left" onClick={() => downloadFile(`/api/documents/${d.id}/download`, d.filename)}>
+                  {d.filename}
+                </button>
+                <span className="text-xs text-secondary">
+                  @{d.uploadedBy?.username ?? "unknown"} · {(d.size / 1024).toFixed(0)} KB · {timeAgo(d.createdAt)}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {(["PENDING", "VERIFIED", "REJECTED"] as const).map((s) => (
+                  <span key={s} className="inline-flex items-center gap-1">
+                    <StatusPill status={s} /> {d.counts?.[s] ?? 0}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button disabled={busy === d.id} onClick={() => rechunk(d)} className={btnPrimary}>
+                  {busy === d.id ? "Re-chunking…" : "Re-chunk"}
+                </button>
+                <label className="inline-flex items-center gap-1.5 text-xs text-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={supersede[d.id] ?? true}
+                    onChange={(e) => setSupersede((s) => ({ ...s, [d.id]: e.target.checked }))}
+                  />
+                  Retire current pending drafts
+                </label>
+                <button onClick={() => openQueue({ id: d.id, filename: d.filename })} className={btnGhost}>
+                  Review its records
+                </button>
+              </div>
+              {results[d.id] && <p className="text-xs text-secondary">{results[d.id]}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -726,6 +1006,7 @@ export default function WorkstationPage() {
   const router = useRouter();
   const { user, ready } = useSession();
   const [tab, setTab] = useState<Tab>("queue");
+  const [docFilter, setDocFilter] = useState<DocFilter>(null);
   const [stats, setStats] = useState<any>(null);
   const [msg, setMsg] = useState("");
   const flash = useCallback((m: string) => {
@@ -754,6 +1035,7 @@ export default function WorkstationPage() {
   const admin = user!.role === "ADMIN";
   const tabs: { value: Tab; label: string; badge?: number }[] = [
     { value: "queue", label: "Review queue", badge: stats?.pending },
+    { value: "documents", label: "Documents" },
     { value: "corrections", label: "Corrections", badge: stats?.corrections },
     { value: "reports", label: "Reports", badge: stats?.reports },
     { value: "entities", label: "Entities" },
@@ -779,7 +1061,16 @@ export default function WorkstationPage() {
           </div>
         )}
         <div className="mt-6">
-          {tab === "queue" && <QueueTab flash={flash} />}
+          {tab === "queue" && <QueueTab flash={flash} docFilter={docFilter} clearDocFilter={() => setDocFilter(null)} />}
+          {tab === "documents" && (
+            <DocumentsTab
+              flash={flash}
+              openQueue={(d) => {
+                setDocFilter(d);
+                setTab("queue");
+              }}
+            />
+          )}
           {tab === "corrections" && <CorrectionsTab flash={flash} />}
           {tab === "reports" && <ReportsTab flash={flash} />}
           {tab === "entities" && <EntitiesTab flash={flash} admin={admin} />}
