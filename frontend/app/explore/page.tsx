@@ -7,11 +7,11 @@ import Header from "@/components/Header";
 import EntityTile, { type ExploreEntity } from "@/components/EntityTile";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api, downloadFile, exploreSeed, timeAgo } from "@/lib/api";
-import { Chip, entityHref, inputCls, Notice, Page } from "@/components/ui";
+import { Chip, entityHref, entityNameCls, inputCls, Notice, Page } from "@/components/ui";
 
 interface ExploreData {
   personalized: boolean;
-  rankingNote: string;
+  rankingNote?: string;
   forYou: ExploreEntity[];
   shelves: { type: string; label: string; total: number; entities: ExploreEntity[] }[];
   documents: { id: string; filename: string; mimeType: string; createdAt: string; verifiedRecords: number }[];
@@ -69,7 +69,7 @@ export default function ExplorePage() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Explore</h1>
-            <p className="text-secondary text-sm mt-1">{data?.rankingNote || "Built from verified records only."}</p>
+            <p className="text-secondary text-sm mt-1">Built from verified records only.</p>
           </div>
           <form onSubmit={search} className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
@@ -92,7 +92,7 @@ export default function ExplorePage() {
               <div className="flex flex-wrap gap-2">
                 {results.entities.map((e) => (
                   <Chip key={e.id} href={entityHref(e)}>
-                    {e.name} · {e.recordCount}
+                    <span className={entityNameCls(e)}>{e.name}</span>
                   </Chip>
                 ))}
               </div>
@@ -142,7 +142,6 @@ export default function ExplorePage() {
                   >
                     <FileText className="w-4 h-4 text-secondary mb-2" />
                     <p className="text-sm font-medium truncate">{d.filename}</p>
-                    <p className="text-xs text-secondary mt-1">{d.verifiedRecords} verified record(s)</p>
                   </button>
                 ))}
               </Shelf>

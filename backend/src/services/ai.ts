@@ -9,7 +9,11 @@ const SYSTEM_PROMPT = `You are Aphring AI — a helpful assistant for Nigeria's 
 Rules:
 1. Answer ONLY from the supplied context. Do not invent facts.
 2. Write in clear, natural language for everyday readers. No JSON, no code fences, no escape sequences, no markdown tables unless truly needed.
-3. Prefer short paragraphs and plain sentences.
+3. Format for easy reading. Never write one giant paragraph:
+   - Start with one short lead sentence that answers the question directly.
+   - Then use short paragraphs of 2–4 sentences each, one idea per paragraph (e.g. early life, work, legacy).
+   - Put a blank line between paragraphs.
+   - You may use *italics* for titles of books or works; avoid headings and long bullet lists.
 4. If the context does not contain relevant information for the question, reply with exactly this sentence and nothing else:
 The Aphring knowledge base currently contains no verified information about this topic.
 5. When you do answer from context, do not invent source labels in the body — the system will attach sources separately only when relevant.
@@ -216,6 +220,10 @@ function extractAnswer(data: any): string {
 }
 
 function humanizeAnswer(text: string): string {
+  return paragraphize(cleanText(text));
+}
+
+function cleanText(text: string): string {
   return text
     .trim()
     .replace(/^```(?:json|text)?\s*/i, "")
@@ -228,6 +236,36 @@ function humanizeAnswer(text: string): string {
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+/** Abbreviations / initials that end in "." but don't end a sentence. */
+const NON_TERMINAL = /(?:\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Gen|Col|Lt|Capt|Rev|Hon|Gov|Sen|Rt|No|vs|etc|e\.g|i\.e|c|ca|approx|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)|\b[A-Z])\.$/;
+
+/**
+ * Safety net for models that ignore the formatting rule: one long block (no line breaks)
+ * becomes paragraphs of ~3 sentences. Conservative — skips abbreviations and initials.
+ */
+function paragraphize(text: string): string {
+  if (text.length < 400 || text.includes("\n")) return text;
+  const sentences: string[] = [];
+  let buf = "";
+  for (const piece of text.split(/(?<=[.!?][)"'”’]?)\s+(?=[A-Z"“*(\d])/)) {
+    buf = buf ? `${buf} ${piece}` : piece;
+    if (!NON_TERMINAL.test(buf)) {
+      sentences.push(buf);
+      buf = "";
+    }
+  }
+  if (buf) sentences.push(buf);
+  if (sentences.length < 4) return text;
+  const paras: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) paras.push(sentences.slice(i, i + 3).join(" "));
+  // Don't leave a lonely last sentence: fold it into the previous paragraph.
+  if (paras.length > 1 && sentences.length % 3 === 1) {
+    const last = paras.pop()!;
+    paras[paras.length - 1] += ` ${last}`;
+  }
+  return paras.join("\n\n");
 }
 
 export async function generateAnswer(
@@ -260,16 +298,31 @@ export async function generateAnswer(
   // No model configured: return verified excerpts directly (zero cost).
   if (!chat.configured) return { answer: excerpts(), sources };
 
-  let answer: string;
+  const answer = await callChatModel(messages, 700);
+
+  const lower = answer.toLowerCase();
+  if (lower.includes("no verified information") || lower.includes("knowledge base currently contains no")) {
+    // We DID find verified records; show them rather than claiming there's nothing.
+    return { answer: `Here is what the verified records say:\n\n${excerpts()}`, sources };
+  }
+  return { answer, sources };
+}
+
+type ChatMessage = { role: string; content: string };
+
+/** One chat-model call (RunPod OpenAI-compatible or legacy serverless). Throws AiServiceError on failure. */
+async function callChatModel(messages: ChatMessage[], maxTokens: number, label = "chat"): Promise<string> {
+  const chat = chatConfig();
   const started = Date.now();
   const secs = () => ((Date.now() - started) / 1000).toFixed(1);
   try {
+    let answer: string;
     if (chat.openaiCompatible) {
       // RunPod (and most hosts): OpenAI-compatible /chat/completions
       const res = await fetch(`${chat.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${chat.key}` },
-        body: JSON.stringify({ model: chat.model, messages, max_tokens: 700, temperature: 0.2 }),
+        body: JSON.stringify({ model: chat.model, messages, max_tokens: maxTokens, temperature: 0.2 }),
         signal: AbortSignal.timeout(180_000),
       });
       if (!res.ok) throw upstreamError(res.status, await res.text());
@@ -282,7 +335,7 @@ export async function generateAnswer(
         method: "POST",
         headers,
         body: JSON.stringify({
-          input: { messages, sampling_params: { max_tokens: 700, temperature: 0.2, top_p: 1, top_k: -1, seed: -1 } },
+          input: { messages, sampling_params: { max_tokens: maxTokens, temperature: 0.2, top_p: 1, top_k: -1, seed: -1 } },
         }),
         signal: AbortSignal.timeout(180_000),
       });
@@ -297,26 +350,62 @@ export async function generateAnswer(
       if (data?.status === "FAILED") throw new AiServiceError("The AI service failed to answer. Please try again.");
       answer = extractAnswer(data);
     }
-    console.info(`[ai] chat completed in ${secs()}s`);
+    console.info(`[ai] ${label} completed in ${secs()}s`);
+    return answer;
   } catch (err: any) {
     if (err instanceof AiServiceError) {
-      console.error(`[ai] chat failed after ${secs()}s: ${err.message}`);
+      console.error(`[ai] ${label} failed after ${secs()}s: ${err.message}`);
       throw err;
     }
-    console.error(`[ai] chat model call failed after ${secs()}s:`, err?.message || err);
+    console.error(`[ai] ${label} model call failed after ${secs()}s:`, err?.message || err);
     throw new AiServiceError(
       err?.name === "TimeoutError" || err?.name === "AbortError"
         ? "The AI service took too long to respond. Please try again."
         : "Couldn't reach the AI service. Please try again shortly."
     );
   }
+}
 
-  const lower = answer.toLowerCase();
-  if (lower.includes("no verified information") || lower.includes("knowledge base currently contains no")) {
-    // We DID find verified records; show them rather than claiming there's nothing.
-    return { answer: `Here is what the verified records say:\n\n${excerpts()}`, sources };
+/** Old behaviour: the first question, trimmed to fit the sidebar. */
+export function fallbackChatTitle(question: string): string {
+  return singleLine(question).slice(0, 60) || "New Chat";
+}
+
+/**
+ * Short topic title for the chat sidebar (≤ 6 words). Cheap: ~24 output tokens, no retrieval.
+ * Falls back to the first-question slice when no model is configured or the call fails.
+ */
+export async function suggestChatTitle(question: string, answerSnippet: string): Promise<string> {
+  const fallback = fallbackChatTitle(question);
+  if (!chatConfig().configured) return fallback;
+  try {
+    const raw = await callChatModel(
+      [
+        {
+          role: "system",
+          content:
+            "You name chat conversations. Reply with a plain title of at most 6 words that reflects the topic. No quotes, no punctuation at the end, no prefix like 'Title:'.",
+        },
+        {
+          role: "user",
+          content: `Question: ${question.slice(0, 300)}\n\nAnswer: ${answerSnippet.slice(0, 500)}\n\nTitle:`,
+        },
+      ],
+      24,
+      "title"
+    );
+    const title = singleLine(raw.split("\n")[0] || "")
+      .replace(/^(?:title\s*:\s*)/i, "")
+      .replace(/^["'“”‘’*#\s]+|["'“”‘’*.\s]+$/g, "")
+      .split(/\s+/)
+      .slice(0, 8)
+      .join(" ")
+      .slice(0, 60)
+      .trim();
+    return title.length >= 3 ? title : fallback;
+  } catch {
+    return fallback;
   }
-  return { answer, sources };
 }
 
 function upstreamError(status: number, body: string) {

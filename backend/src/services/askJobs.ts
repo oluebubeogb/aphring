@@ -28,6 +28,10 @@ export interface AskJob {
   userId?: string;
   /** Saved assistant message (signed-in jobs), same shape as the old sync response. */
   message?: unknown;
+  /** Chat title after this answer (signed-in jobs). */
+  title?: string;
+  /** True while an AI title is still being generated after the answer landed (keep polling briefly). */
+  titlePending?: boolean;
 }
 
 const TTL_MS = 15 * 60 * 1000;
@@ -59,6 +63,12 @@ export function getAskJob(id: string): AskJob | undefined {
 export function completeAskJob(id: string, data: Partial<Omit<AskJob, "id" | "createdAt" | "status">>) {
   const job = jobs.get(id);
   if (job) Object.assign(job, data, { status: "done" as const });
+}
+
+/** Update a finished job in place (e.g. the AI chat title landing after the answer). */
+export function patchAskJob(id: string, data: Partial<Pick<AskJob, "title" | "titlePending">>) {
+  const job = jobs.get(id);
+  if (job) Object.assign(job, data);
 }
 
 export function failAskJob(id: string, error: string) {

@@ -3,8 +3,16 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { prisma } from "../services/prisma.js";
 import { requireAuth, optionalAuth, AuthRequest } from "../middleware/auth.js";
-import { retrieveContext, generateAnswer, AiServiceError, NO_INFO, RetrievedSource } from "../services/ai.js";
-import { createAskJob, getAskJob, completeAskJob, failAskJob, AskJob } from "../services/askJobs.js";
+import {
+  retrieveContext,
+  generateAnswer,
+  AiServiceError,
+  NO_INFO,
+  RetrievedSource,
+  suggestChatTitle,
+  fallbackChatTitle,
+} from "../services/ai.js";
+import { createAskJob, getAskJob, completeAskJob, failAskJob, patchAskJob, AskJob } from "../services/askJobs.js";
 import { bumpFromRecords, SIGNAL_WEIGHTS, track } from "../services/affinity.js";
 
 const router = Router();
@@ -22,7 +30,35 @@ function jobPayload(job: AskJob, guest: boolean) {
   if (job.status === "error") return { status: "error", jobId: job.id, error: job.error };
   return guest
     ? { status: "done", jobId: job.id, answer: job.answer, sources: job.sources ?? [], saved: false }
-    : { status: "done", jobId: job.id, message: job.message, sources: job.sources ?? [] };
+    : {
+        status: "done",
+        jobId: job.id,
+        message: job.message,
+        sources: job.sources ?? [],
+        title: job.title,
+        titlePending: job.titlePending ?? false,
+      };
+}
+
+/**
+ * AI chat titles, kept cheap: once after the first answered question (while the title is still the
+ * placeholder / first-question slice), and one refresh after the 3rd question. Never on every message.
+ */
+async function maybeRetitle(chatId: string, title: string, latestQuestion: string, answer: string): Promise<string | null> {
+  const userMsgs = await prisma.message.findMany({
+    where: { chatId, role: "USER" },
+    orderBy: { createdAt: "asc" },
+    select: { content: true },
+    take: 4,
+  });
+  const n = userMsgs.length;
+  const first = userMsgs[0]?.content ?? latestQuestion;
+  const placeholder = title === "New Chat" || title === fallbackChatTitle(first);
+  if (n === 3) {
+    return suggestChatTitle(userMsgs.map((m) => m.content).join(" / "), answer);
+  }
+  if (n < 3 && placeholder) return suggestChatTitle(latestQuestion, answer);
+  return null;
 }
 
 /**
@@ -125,13 +161,46 @@ router.get("/:id", async (req: AuthRequest, res, next) => {
         })
       : [];
     const byId = new Map(recs.map((r) => [r.id, r]));
+    const votes = await prisma.messageVote.findMany({
+      where: { userId: req.user!.id, messageId: { in: chat.messages.map((m) => m.id) } },
+      select: { messageId: true, type: true },
+    });
+    const vm = new Map(votes.map((v) => [v.messageId, v.type]));
     res.json({
       ...chat,
       messages: chat.messages.map((m) => ({
         ...m,
         sources: m.sourceIds.map((id) => byId.get(id)).filter(Boolean),
+        myVote: vm.get(m.id) ?? null,
       })),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Thumbs up/down on an assistant answer in one of your chats. Same type again = remove; other type = switch. */
+router.post("/messages/:messageId/vote", async (req: AuthRequest, res, next) => {
+  try {
+    const { type } = z.object({ type: z.enum(["UP", "DOWN"]) }).parse(req.body);
+    const messageId = String(req.params.messageId);
+    const userId = req.user!.id;
+    const msg = await prisma.message.findFirst({
+      where: { id: messageId, role: "ASSISTANT", chat: { userId } },
+      select: { id: true },
+    });
+    if (!msg) return res.status(404).json({ error: "Message not found" });
+    const existing = await prisma.messageVote.findUnique({ where: { userId_messageId: { userId, messageId } } });
+    let myVote: "UP" | "DOWN" | null = type;
+    if (existing && existing.type === type) {
+      await prisma.messageVote.delete({ where: { id: existing.id } });
+      myVote = null;
+    } else if (existing) {
+      await prisma.messageVote.update({ where: { id: existing.id }, data: { type } });
+    } else {
+      await prisma.messageVote.create({ data: { userId, messageId, type } });
+    }
+    res.json({ messageId, myVote });
   } catch (err) {
     next(err);
   }
@@ -156,8 +225,11 @@ router.post("/:id/messages", chatLimiter, async (req: AuthRequest, res, next) =>
     if (!chat) return res.status(404).json({ error: "Chat not found" });
 
     await prisma.message.create({ data: { chatId, role: "USER", content } });
-    if (chat.title === "New Chat") {
-      await prisma.chat.update({ where: { id: chatId }, data: { title: content.slice(0, 60) } });
+    let title = chat.title;
+    if (title === "New Chat") {
+      // Placeholder until the AI title lands after the first answer.
+      title = fallbackChatTitle(content);
+      await prisma.chat.update({ where: { id: chatId }, data: { title } });
     }
 
     const sources = await retrieveContext(content);
@@ -167,7 +239,7 @@ router.post("/:id/messages", chatLimiter, async (req: AuthRequest, res, next) =>
         data: { chatId, role: "ASSISTANT", content: NO_INFO, sourceIds: [] },
       });
       await prisma.chat.update({ where: { id: chatId }, data: { updatedAt: new Date() } });
-      return res.json({ status: "done", message: assistantMsg, sources: [] });
+      return res.json({ status: "done", message: { ...assistantMsg, myVote: null }, sources: [], title });
     }
 
     const userId = req.user!.id;
@@ -180,7 +252,26 @@ router.post("/:id/messages", chatLimiter, async (req: AuthRequest, res, next) =>
       });
       await prisma.chat.update({ where: { id: chatId }, data: { updatedAt: new Date() } });
       track(bumpFromRecords(userId, sourceIds, SIGNAL_WEIGHTS.chatSource));
-      completeAskJob(jobId, { answer, message: assistantMsg, messageId: assistantMsg.id, sources: toSourceRefs(used) });
+      // Deliver the answer first; the (cheap) title call runs after and the browser keeps polling briefly.
+      completeAskJob(jobId, {
+        answer,
+        message: { ...assistantMsg, myVote: null },
+        messageId: assistantMsg.id,
+        sources: toSourceRefs(used),
+        title,
+        titlePending: true,
+      });
+      try {
+        const next = await maybeRetitle(chatId, title, content, answer);
+        if (next && next !== title) {
+          await prisma.chat.update({ where: { id: chatId }, data: { title: next } });
+          title = next;
+        }
+      } catch (err) {
+        console.error("[chat] title update failed:", (err as Error)?.message || err);
+      } finally {
+        patchAskJob(jobId, { title, titlePending: false });
+      }
     })().catch((err) => failAskJob(jobId, jobErrorMessage(err)));
 
     res.status(202).json({ status: "pending", jobId });

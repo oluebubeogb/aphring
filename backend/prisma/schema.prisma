@@ -117,6 +117,7 @@ model User {
   saves               SavedRecord[]
   auditLogs           AuditLog[]
   emailChallenges     EmailChallenge[]
+  messageVotes        MessageVote[]
 
   @@map("users")
 }
@@ -382,10 +383,27 @@ model Message {
   sourceIds String[]    @default([]) @map("source_ids")
   createdAt DateTime    @default(now()) @map("created_at")
 
-  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chat  Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  votes MessageVote[]
 
   @@index([chatId])
   @@map("messages")
+}
+
+/// Thumbs up/down on an assistant answer (one per user per message).
+model MessageVote {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  messageId String   @map("message_id")
+  type      VoteType
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([messageId])
+  @@map("message_votes")
 }
 
 model AudioUpload {

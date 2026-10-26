@@ -86,6 +86,28 @@ once; the page then polls every 1.5 s (up to 3 minutes) for the answer. A RunPod
 finished and billed. Jobs live in backend memory for 15 minutes (single backend replica). Raising the
 Coolify/Traefik read timeout to 180 s or more is optional but still helps other long routes such as uploads.
 
+## Chat, answers and sources
+
+- **Chat permalinks.** Each saved conversation lives at `/chat/:id`, so a refresh (or a shared tab) reopens
+  the same chat. `/chat` is a new conversation (and guest Ask); the first question creates the chat and the
+  address bar moves to `/chat/:id`. Only the owner can open a chat; anything else goes back to `/chat`.
+- **AI chat titles.** After the first answer, one tiny model call (≤ 24 tokens, no retrieval) names the chat
+  in ≤ 6 words; it is refreshed once more after the 3rd question. Without a model (or on failure) the title
+  stays the first question.
+- **Answer votes and copy.** Each answer has Copy (answer text only). Signed-in users can thumbs up / down
+  their own chat answers (`POST /api/chats/messages/:id/vote`, migration `0003_message_votes`); voting the
+  same way again removes the vote.
+- **Readable answers.** The system prompt asks for a short lead sentence and 2–4 sentence paragraphs; if a
+  model still returns one long block, the backend splits it into paragraphs.
+- **Source overlay.** Clicking a source opens it over the chat (blurred background, Esc / click outside to
+  close) with an "Open in new page" button; ctrl/cmd-click still opens the record page.
+- **No public verifier.** Record pages, cards, the public API and markdown exports no longer show who
+  verified a record. The verifier is still stored and visible in the Workstation.
+- **Explore tiles.** Tiles show a short excerpt from a random verified record linked to that entity (around
+  the first mention of its name). No personalisation captions; ranking still adapts quietly. No AI on Explore.
+  Tiles, entity pages and document cards no longer print "N verified records" (counts still drive ranking).
+- **PERSON names** render bold in small caps on tiles, chips and entity pages.
+
 ## Documents, re-chunk and bulk review
 
 Uploaded documents are split into records by heading and topic. Each extract carries a short

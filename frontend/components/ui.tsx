@@ -75,6 +75,15 @@ export function Tabs<T extends string>({
   );
 }
 
+/** PERSON entity names render bold + small caps; other entity types keep the default style. */
+export function isPersonEntity(e: { type?: string | null; entityType?: string | null }) {
+  return (e.type || e.entityType || "").toUpperCase() === "PERSON";
+}
+export const personNameCls = "font-bold [font-variant:small-caps]";
+export function entityNameCls(e: { type?: string | null; entityType?: string | null }) {
+  return isPersonEntity(e) ? personNameCls : "";
+}
+
 export function entityHref(e: { type?: string; entityType?: string; slug: string }) {
   return `/explore/${(e.type || e.entityType || "topic").toLowerCase()}/${e.slug}`;
 }

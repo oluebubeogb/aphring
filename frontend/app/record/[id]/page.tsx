@@ -100,7 +100,6 @@ function RecordView({ initial }: { initial: Full }) {
               · by <Link href={`/u/${rec.createdBy.username}`} className="hover:text-primary">@{rec.createdBy.username}</Link>
             </>
           )}
-          {rec.verifiedBy && <span>· verified by @{rec.verifiedBy.username} {timeAgo(rec.verifiedAt)}</span>}
           {rec.revisions > 0 && <span>· {rec.revisions} revision(s)</span>}
         </div>
         {!verified && rec.reviewNote && <Notice>Moderator note: {rec.reviewNote}</Notice>}

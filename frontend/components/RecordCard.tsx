@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowBigDown, ArrowBigUp, Bookmark, BookmarkCheck, Download, FileText, Flag, Share2, PencilLine } from "lucide-react";
 import { api, downloadFile, isLoggedIn, timeAgo } from "@/lib/api";
-import { Chip, entityHref } from "@/components/ui";
+import { Chip, entityHref, entityNameCls } from "@/components/ui";
 
 export interface RecordEntity {
   id: string;
@@ -170,7 +170,7 @@ export function EntityChips({ entities }: { entities: RecordEntity[] }) {
     <div className="flex flex-wrap gap-1.5">
       {entities.map((e) => (
         <Chip key={e.id} href={entityHref(e)} title={e.entityType.toLowerCase()}>
-          {e.name}
+          <span className={entityNameCls(e)}>{e.name}</span>
         </Chip>
       ))}
     </div>

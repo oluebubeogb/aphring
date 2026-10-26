@@ -20,7 +20,9 @@ export interface ShelfEntity {
   sourcedCount: number;
   lastVerifiedAt: string | null;
   score: number;
-  reason?: string;
+  /** Short passage from a random VERIFIED record linked to this entity (mentions the name when possible). */
+  excerpt: string | null;
+  excerptRecordId: string | null;
 }
 
 interface Row {
@@ -94,7 +96,8 @@ export async function buildExplore(opts: { userId?: string; seed?: string; perSh
       sourcedCount: r.sourced_count,
       lastVerifiedAt: r.last_verified ? new Date(r.last_verified).toISOString() : null,
       score: Math.round(score * 1000) / 1000,
-      reason: aff > 0.2 ? "Because of your searches, votes and chats" : recency > 0.6 ? "Recently verified" : undefined,
+      excerpt: null,
+      excerptRecordId: null,
     };
   });
 
@@ -119,6 +122,18 @@ export async function buildExplore(opts: { userId?: string; seed?: string; perSh
         .slice(0, 10)
     : [];
 
+  // Tile excerpts: only for entities actually shown (one cheap SQL query, no AI).
+  const shown = new Map<string, ShelfEntity>();
+  for (const e of [...shelves.flatMap((sh) => sh.entities), ...forYou]) shown.set(e.id, e);
+  const excerpts = await loadEntityExcerpts([...shown.values()]);
+  for (const e of shown.values()) {
+    const x = excerpts.get(e.id);
+    if (x) {
+      e.excerpt = x.excerpt;
+      e.excerptRecordId = x.recordId;
+    }
+  }
+
   // Documents shelf: source files cited by verified records (no file paths).
   const documents = await prisma.document.findMany({
     where: { citations: { some: { knowledgeRecord: { status: "VERIFIED" } } } },
@@ -142,11 +157,8 @@ export async function buildExplore(opts: { userId?: string; seed?: string; perSh
 
   return {
     personalized,
-    rankingNote: personalized
-      ? "Ranked for you from your searches, votes and chats."
-      : opts.userId
-        ? "Showing what the verified knowledge base contains. Search, vote and ask questions and this page adapts to you."
-        : "Showing what the verified knowledge base contains. Sign in and explore to personalise.",
+    // Ranking still adapts quietly; no personalisation copy is shown to readers.
+    rankingNote: "Built from verified records only.",
     forYou,
     shelves: shelves.map(({ shelfScore, ...s }) => s),
     documents: documents.map((d) => ({
@@ -158,4 +170,114 @@ export async function buildExplore(opts: { userId?: string; seed?: string; perSh
     })),
     recent,
   };
+}
+
+const EXCERPT_MIN = 140;
+const EXCERPT_MAX = 220;
+const NAME_STOP = new Set(["the", "and", "of", "for", "in", "on", "at", "to", "a", "an", "state", "local", "government", "area"]);
+
+/** Significant lowercase words of an entity name ("Chinua Achebe" → [chinua, achebe]). */
+function nameTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 3 && !NAME_STOP.has(w));
+}
+
+function escapeRegex(t: string) {
+  return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Clean record text for a one-line tile: drop the "About …" subject line chunks carry, collapse whitespace. */
+function tileText(content: string): string {
+  return content
+    .replace(/^About [^\n]*\n+/, "")
+    .replace(/[\u0000-\u001F]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Earliest whole-word match of any name token (case-insensitive), or -1. */
+function firstMatch(text: string, tokens: string[]): number {
+  let best = -1;
+  for (const t of tokens) {
+    const m = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegex(t)}(?![\\p{L}\\p{N}])`, "iu").exec(text);
+    if (m && (best === -1 || m.index < best)) best = m.index;
+  }
+  return best;
+}
+
+/**
+ * ~140–220 chars around the first mention of the name, snapped to sentence/word edges, "…" where clipped.
+ * Falls back to the start of the text when the name isn't mentioned.
+ */
+export function makeExcerpt(content: string, name: string): { text: string; matched: boolean } {
+  const text = tileText(content);
+  if (!text) return { text: "", matched: false };
+  const at = firstMatch(text, nameTokens(name));
+  if (text.length <= EXCERPT_MAX) return { text, matched: at >= 0 };
+
+  let start = 0;
+  if (at > 0) {
+    // Start at the sentence holding the match when it is close; else ~60 chars before, on a word edge.
+    const before = text.slice(0, at);
+    const sentence = Math.max(before.lastIndexOf(". "), before.lastIndexOf("! "), before.lastIndexOf("? "));
+    if (sentence >= 0 && at - sentence <= 120) start = sentence + 2;
+    else {
+      start = Math.max(0, at - 60);
+      const sp = text.indexOf(" ", start);
+      if (sp > 0 && sp < at) start = sp + 1;
+    }
+  }
+  let end = Math.min(text.length, start + EXCERPT_MAX);
+  if (end < text.length) {
+    // Prefer ending on a sentence inside the window, else on a word.
+    const win = text.slice(start, end);
+    const stop = Math.max(win.lastIndexOf(". "), win.lastIndexOf("! "), win.lastIndexOf("? "));
+    if (stop + 1 >= EXCERPT_MIN) end = start + stop + 1;
+    else {
+      const sp = win.lastIndexOf(" ");
+      if (sp >= EXCERPT_MIN - 40) end = start + sp;
+    }
+  }
+  let out = text.slice(start, end).trim().replace(/[,;:\s]+$/, "");
+  if (start > 0) out = `…${out}`;
+  if (end < text.length && !/[.!?]$/.test(out)) out = `${out}…`;
+  return { text: out, matched: at >= 0 };
+}
+
+/**
+ * For each entity, a few random VERIFIED records linked to it (SQL), then one excerpt —
+ * preferring records that actually mention the entity name. Varies on each load; no AI.
+ */
+async function loadEntityExcerpts(entities: ShelfEntity[]): Promise<Map<string, { excerpt: string; recordId: string }>> {
+  const out = new Map<string, { excerpt: string; recordId: string }>();
+  if (entities.length === 0) return out;
+  const rows = await prisma.$queryRawUnsafe<Array<{ entity_id: string; id: string; content: string }>>(
+    `SELECT entity_id, id, content FROM (
+       SELECT ke.entity_id, kr.id, left(kr.content, 4000) AS content,
+              row_number() OVER (PARTITION BY ke.entity_id ORDER BY random()) AS rn
+       FROM knowledge_entities ke
+       JOIN knowledge_records kr ON kr.id = ke.knowledge_record_id AND kr.status = 'VERIFIED'
+       WHERE ke.entity_id = ANY($1::text[])
+     ) x
+     WHERE rn <= 4`,
+    entities.map((e) => e.id)
+  );
+  const byEntity = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const list = byEntity.get(r.entity_id) || [];
+    list.push(r);
+    byEntity.set(r.entity_id, list);
+  }
+  for (const e of entities) {
+    const cands = (byEntity.get(e.id) || [])
+      .map((r) => ({ id: r.id, ...makeExcerpt(r.content, e.name) }))
+      .filter((c) => c.text);
+    if (cands.length === 0) continue;
+    // Rows are already in random order: take the first that mentions the name, else the first one.
+    const pick = cands.find((c) => c.matched) || cands[0];
+    out.set(e.id, { excerpt: pick.text, recordId: pick.id });
+  }
+  return out;
 }

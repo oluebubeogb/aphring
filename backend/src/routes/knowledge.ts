@@ -113,7 +113,7 @@ router.get("/:id/export", optionalAuth, async (req: AuthRequest, res, next) => {
       r.content,
       "",
       "---",
-      `Contributed by @${r.createdBy.username}` + (r.verifiedBy ? ` · verified by @${r.verifiedBy.username}` : ""),
+      `Contributed by @${r.createdBy.username}`,
       r.verifiedAt ? `Verified: ${r.verifiedAt.toISOString().slice(0, 10)}` : "",
       ...(r.citations.length
         ? ["", "Sources:", ...r.citations.map((c) => `- ${c.document.filename}${c.paragraph ? ` (${c.paragraph})` : ""}`)]

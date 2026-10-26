@@ -1,9 +1,11 @@
 import { Prisma } from "@prisma/client";
 
-/** Public-safe include for records: no emails, no storage paths. */
+/**
+ * Public-safe include for records: no emails, no storage paths, and no verifier identity
+ * (who verified a record is moderator-only; the Workstation loads it with its own include).
+ */
 export const publicRecordInclude = {
   createdBy: { select: { id: true, username: true, name: true, reputation: true } },
-  verifiedBy: { select: { id: true, username: true, name: true } },
   citations: {
     select: {
       id: true,
@@ -38,7 +40,8 @@ export function shapeRecord(r: PublicRecord, extra?: { myVote?: string | null; s
     createdAt: r.createdAt,
     verifiedAt: r.verifiedAt,
     createdBy: r.createdBy,
-    verifiedBy: r.verifiedBy,
+    /** Never exposed publicly (security): verifier stays in the DB and the Workstation only. */
+    verifiedBy: null,
     citations: r.citations,
     entities: r.entities.map((e) => ({ ...e.entity, source: e.source })),
     pendingCorrections: r._count.corrections,
