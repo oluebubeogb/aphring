@@ -34,6 +34,9 @@ services:
       # Comma-separated usernames that are admins. Removing a name demotes that user on next request.
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       RUNPOD_API_KEY: ${RUNPOD_API_KEY:-}
+      RUNPOD_BASE_URL: ${RUNPOD_BASE_URL:-}
+      RUNPOD_MODEL: ${RUNPOD_MODEL:-}
+      # Optional legacy serverless endpoint
       RUNPOD_ENDPOINT_ID: ${RUNPOD_ENDPOINT_ID:-}
       EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}

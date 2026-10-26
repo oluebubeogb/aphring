@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import { createEmbedding, embeddingToSql, embeddingsEnabled } from "./embeddings.js";
 import { singleLine } from "./text.js";
+import { chatConfig } from "../config.js";
 
 const SYSTEM_PROMPT = `You are Aphring AI — a helpful assistant for Nigeria's community knowledge network.
 
@@ -128,31 +129,48 @@ export async function generateAnswer(
     },
   ];
 
-  let endpointId = (process.env.RUNPOD_ENDPOINT_ID || "").trim();
-  const apiKey = process.env.RUNPOD_API_KEY;
-  const m = endpointId.match(/\/v2\/([^/]+)/);
-  if (m) endpointId = m[1];
-  endpointId = endpointId.replace(/\/runsync\/?$/, "").replace(/\/$/, "");
+  const chat = chatConfig();
 
   // No model configured: return verified excerpts directly (zero cost).
-  if (!endpointId || !apiKey) {
+  if (!chat.configured) {
     const answer = sources.map((s) => `${s.title}: ${s.content.slice(0, 400)}`).join("\n\n");
     return { answer: humanizeAnswer(answer), sources };
   }
 
-  const res = await fetch(`https://api.runpod.ai/v2/${endpointId}/runsync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      input: {
-        messages,
-        sampling_params: { max_tokens: 700, temperature: 0.2, top_p: 1, top_k: -1, seed: -1 },
+  let answer: string;
+  if (chat.openaiCompatible) {
+    // RunPod (and most hosts): OpenAI-compatible /chat/completions
+    const url = `${chat.baseUrl}/chat/completions`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${chat.key}`,
       },
-    }),
-  });
-  if (!res.ok) throw new Error(`Runpod error: ${res.status} ${await res.text()}`);
-
-  const answer = extractAnswer(await res.json());
+      body: JSON.stringify({
+        model: chat.model,
+        messages,
+        max_tokens: 700,
+        temperature: 0.2,
+      }),
+    });
+    if (!res.ok) throw new Error(`Chat model error: ${res.status} ${await res.text()}`);
+    answer = extractAnswer(await res.json());
+  } else {
+    // Legacy RunPod serverless /v2/{id}/runsync
+    const res = await fetch(`https://api.runpod.ai/v2/${chat.endpointId}/runsync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${chat.key}` },
+      body: JSON.stringify({
+        input: {
+          messages,
+          sampling_params: { max_tokens: 700, temperature: 0.2, top_p: 1, top_k: -1, seed: -1 },
+        },
+      }),
+    });
+    if (!res.ok) throw new Error(`Runpod error: ${res.status} ${await res.text()}`);
+    answer = extractAnswer(await res.json());
+  }
   const lower = answer.toLowerCase();
   if (lower.includes("no verified information") || lower.includes("knowledge base currently contains no")) {
     return { answer: NO_INFO, sources: [] };

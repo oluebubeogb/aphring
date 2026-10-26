@@ -44,7 +44,7 @@ Use a **new empty Postgres** (new Coolify project / new volume). This build ship
 | `ADMIN_USERNAMES` | yes | Comma-separated admin usernames, case-insensitive. |
 | `POSTGRES_PASSWORD` | yes (Docker) | Database password used by compose. |
 | `DATABASE_URL` | local dev | Set automatically by compose. |
-| `RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID` | no | Chat model. Without them, Ask returns the matching verified excerpts with links and no model call. |
+| `RUNPOD_API_KEY`, `RUNPOD_BASE_URL`, `RUNPOD_MODEL` | no | Chat via OpenAI-compatible API (RunPod). Without them, Ask returns verified excerpts with no model call. Optional legacy: `RUNPOD_ENDPOINT_ID` for serverless `/runsync`. |
 | `EMBEDDING_API_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` | no | Semantic search. Records are embedded once, when verified. Without them, keyword search is used. |
 | `OPENAI_API_KEY` | no | Whisper transcription for oral uploads. Without it, contributors paste a transcript. |
 | `FRONTEND_URL` | no | CORS origin(s), only if browsers call the backend directly. |

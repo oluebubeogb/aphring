@@ -67,6 +67,30 @@ export function embeddingConfig() {
   };
 }
 
+
+/** OpenAI-compatible chat (RunPod base URL + model + API key). */
+export function chatConfig() {
+  const key = (process.env.RUNPOD_API_KEY || process.env.CHAT_API_KEY || "").trim();
+  const baseUrl = (process.env.RUNPOD_BASE_URL || process.env.CHAT_API_URL || "").trim().replace(/\/$/, "");
+  const model = (process.env.RUNPOD_MODEL || process.env.CHAT_MODEL || "").trim();
+  // Legacy serverless endpoint (optional fallback)
+  let endpointId = (process.env.RUNPOD_ENDPOINT_ID || "").trim();
+  const m = endpointId.match(/\/v2\/([^/]+)/);
+  if (m) endpointId = m[1];
+  endpointId = endpointId.replace(/\/runsync\/?$/, "").replace(/\/$/, "");
+  const openaiCompatible = !!(key && baseUrl && model);
+  const legacyServerless = !!(key && endpointId);
+  return {
+    key,
+    baseUrl,
+    model,
+    endpointId,
+    openaiCompatible,
+    legacyServerless,
+    configured: openaiCompatible || legacyServerless,
+  };
+}
+
 export function validateStartupConfig() {
   getJwtSecret();
   const emb = embeddingConfig();
@@ -79,5 +103,11 @@ export function validateStartupConfig() {
   }
   if (getAdminUsernames().size === 0) {
     console.warn("[config] ADMIN_USERNAMES is empty — nobody will have admin access.");
+  }
+  const chat = chatConfig();
+  if (!chat.configured) {
+    console.warn(
+      "[config] Chat model not set (RUNPOD_API_KEY + RUNPOD_BASE_URL + RUNPOD_MODEL) — Ask quotes verified excerpts."
+    );
   }
 }

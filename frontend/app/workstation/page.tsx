@@ -701,7 +701,7 @@ function OpsTab({ flash }: { flash: (m: string) => void }) {
         </div>
         <div className="p-4 rounded-xl border border-border bg-surface space-y-1">
           <p className="font-medium">AI services</p>
-          <p className="text-secondary">Chat model (Runpod): {ops.chatModel.configured ? "configured" : "not configured, answers quote verified records directly"}</p>
+          <p className="text-secondary">Chat model: {ops.chatModel.configured ? `configured${ops.chatModel.model ? ` · ${ops.chatModel.model}` : ""}` : "not configured, answers quote verified records directly"}</p>
           <p className="text-secondary">Speech-to-text: {ops.stt.configured ? "configured" : "not configured, transcripts must be pasted"}</p>
         </div>
       </div>

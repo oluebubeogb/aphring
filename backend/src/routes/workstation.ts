@@ -12,7 +12,7 @@ import { reviewRecord } from "../services/review.js";
 import { suggestEntities, mergeEntities, slugify, ENTITY_TYPES, cleanEntityName } from "../services/entities.js";
 import { embedRecords, embeddingsEnabled, staleVerifiedIds } from "../services/embeddings.js";
 import { audit } from "../services/roles.js";
-import { getAdminUsernames, embeddingConfig } from "../config.js";
+import { getAdminUsernames, embeddingConfig, chatConfig } from "../config.js";
 import { HttpError } from "../middleware/error.js";
 import { KNOWLEDGE_TYPES } from "./knowledge.js";
 
@@ -426,7 +426,7 @@ router.get("/ops", adminOnly, async (_req, res, next) => {
     res.json({
       envAdmins: [...getAdminUsernames()],
       embeddings: { enabled: embeddingsEnabled(), fake: cfg.fake, model: cfg.model, embedded, stale },
-      chatModel: { configured: !!(process.env.RUNPOD_ENDPOINT_ID && process.env.RUNPOD_API_KEY) },
+      chatModel: { configured: chatConfig().configured, model: chatConfig().model || null },
       stt: { configured: !!process.env.OPENAI_API_KEY },
     });
   } catch (err) {
