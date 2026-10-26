@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, MessageSquare, Send, Menu, X, BookOpen, Copy, Check, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, MessageSquare, Send, Menu, X, Compass, Copy, Check, ThumbsUp, ThumbsDown, Rss, User, LayoutDashboard, Moon, Sun, LogOut, Sparkles, LogIn } from "lucide-react";
+import { IconBubble, TONES } from "@/components/Colorful";
 import { api, isLoggedIn, clearToken, isStaff, getStoredUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 import SourceOverlay, { type SourceRef } from "@/components/SourceOverlay";
@@ -325,8 +326,9 @@ export default function ChatView({ chatId }: { chatId?: string }) {
         } md:translate-x-0 fixed md:static z-30 w-64 h-full border-r border-border bg-surface flex flex-col transition-transform`}
       >
         <div className="p-4 flex items-center justify-between border-b border-border">
-          <Link href="/" className="font-semibold tracking-tight">
-            aphring
+          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="bg-gradient-to-r from-emerald-600 via-sky-600 to-violet-600 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">aphring</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -339,9 +341,9 @@ export default function ChatView({ chatId }: { chatId?: string }) {
         <div className="p-3">
           <button
             onClick={newChat}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-background transition"
+            className="group w-full flex items-center gap-2 px-2 py-2 rounded-lg border border-border text-sm font-medium hover:bg-background hover:border-violet-300 dark:hover:border-violet-500/40 hover:shadow-sm transition"
           >
-            <Plus className="w-4 h-4" />
+            <IconBubble icon={Plus} tone="violet" size="sm" className="transition-transform duration-300 group-hover:rotate-90" />
             New Chat
           </button>
         </div>
@@ -357,41 +359,44 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               onClick={() => setSidebarOpen(false)}
               title={c.title}
               aria-current={activeChat === c.id ? "page" : undefined}
-              className={`block w-full text-left px-3 py-2 rounded-lg text-sm truncate transition ${
+              className={`group flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-lg text-sm transition duration-200 hover:translate-x-0.5 ${
                 activeChat === c.id
-                  ? "bg-background text-primary"
-                  : "text-secondary hover:bg-background"
+                  ? "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-200"
+                  : "text-secondary hover:bg-background hover:text-primary"
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5 inline mr-2 opacity-60" />
-              {c.title}
+              <IconBubble
+                icon={MessageSquare}
+                tone={activeChat === c.id ? "violet" : "slate"}
+                size="xs"
+                className={`shrink-0 ${activeChat === c.id ? "" : "opacity-70 group-hover:opacity-100"}`}
+              />
+              <span className="truncate">{c.title}</span>
             </Link>
           ))}
         </div>
 
-        <div className="p-3 border-t border-border space-y-1 text-sm">
-          <Link
-            href="/explore"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition"
-          >
-            <BookOpen className="w-4 h-4" />
+        <div className="p-3 border-t border-border space-y-0.5 text-sm">
+          <Link href="/explore" className="side-link group">
+            <IconBubble icon={Compass} tone="emerald" size="sm" className="nav-bubble" />
             Explore
           </Link>
-          <Link href="/feed" className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition">
+          <Link href="/feed" className="side-link group">
+            <IconBubble icon={Rss} tone="sky" size="sm" className="nav-bubble" />
             Feed
           </Link>
-          <Link href="/me" className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition">
+          <Link href="/me" className="side-link group">
+            <IconBubble icon={User} tone="teal" size="sm" className="nav-bubble" />
             My profile
           </Link>
           {staff && (
-            <Link href="/workstation" className="flex items-center gap-2 px-3 py-2 rounded-lg text-secondary hover:bg-background transition">
+            <Link href="/workstation" className="side-link group">
+              <IconBubble icon={LayoutDashboard} tone="slate" size="sm" className="nav-bubble" />
               Workstation
             </Link>
           )}
-          <button
-            onClick={toggle}
-            className="w-full text-left px-3 py-2 rounded-lg text-secondary hover:bg-background transition"
-          >
+          <button onClick={toggle} className="side-link group w-full text-left">
+            <IconBubble icon={theme === "light" ? Moon : Sun} tone={theme === "light" ? "indigo" : "yellow"} size="sm" className="nav-bubble group-hover:rotate-12" />
             {theme === "light" ? "Dark mode" : "Light mode"}
           </button>
           <button
@@ -399,8 +404,9 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               clearToken();
               router.push("/");
             }}
-            className="w-full text-left px-3 py-2 rounded-lg text-secondary hover:bg-background transition"
+            className="side-link group w-full text-left"
           >
+            <IconBubble icon={LogOut} tone="rose" size="sm" className="nav-bubble" />
             Sign out
           </button>
         </div>
@@ -411,8 +417,9 @@ export default function ChatView({ chatId }: { chatId?: string }) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-border flex items-center px-4 gap-3">
           {guest ? (
-            <Link href="/" className="font-semibold tracking-tight">
-              aphring
+            <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
+              <span className="brand-mark" aria-hidden="true" />
+              <span className="bg-gradient-to-r from-emerald-600 via-sky-600 to-violet-600 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">aphring</span>
             </Link>
           ) : (
             <button
@@ -429,8 +436,16 @@ export default function ChatView({ chatId }: { chatId?: string }) {
           </span>
           {guest && (
             <div className="flex items-center gap-3 text-sm">
-              <Link href="/explore" className="text-secondary hover:text-primary">Explore</Link>
-              <Link href={`/login?next=/chat${activeChat ? `/${activeChat}` : ""}`} className="px-3 py-1.5 rounded-lg bg-accent text-background">Sign in</Link>
+              <Link href="/explore" className="nav-link group text-secondary hover:text-primary">
+                <IconBubble icon={Compass} tone="emerald" size="sm" className="nav-bubble" />
+                <span className="hidden sm:inline">Explore</span>
+              </Link>
+              <Link
+                href={`/login?next=/chat${activeChat ? `/${activeChat}` : ""}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-background hover:opacity-90 hover:-translate-y-0.5 transition"
+              >
+                <LogIn className="w-4 h-4" /> Sign in
+              </Link>
             </div>
           )}
         </header>
@@ -440,8 +455,14 @@ export default function ChatView({ chatId }: { chatId?: string }) {
             <p className="text-center text-sm text-secondary">Loading conversation…</p>
           )}
           {!activeChat && !loadingChat && messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
-              <h2 className="text-2xl font-semibold">Ask Aphring</h2>
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 animate-fade-up">
+              <IconBubble icon={Sparkles} tone="violet" size="lg" className="animate-float-soft" />
+              <h2 className="text-2xl font-semibold">
+                Ask{" "}
+                <span className="bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">
+                  Aphring
+                </span>
+              </h2>
               <p className="text-secondary max-w-md">
                 Answers come only from verified records, with links to each
                 source. If nothing verified matches, Aphring says so.
@@ -453,15 +474,20 @@ export default function ChatView({ chatId }: { chatId?: string }) {
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`flex ${
+                className={`flex gap-2 animate-fade-up ${
                   m.role === "USER" ? "justify-end" : "justify-start"
                 }`}
               >
+                {m.role === "ASSISTANT" && (
+                  <IconBubble icon={Sparkles} tone={m.error ? "rose" : "violet"} size="sm" className="shrink-0 mt-1" />
+                )}
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                     m.role === "USER"
-                      ? "bg-accent text-background"
-                      : "bg-surface border border-border text-primary"
+                      ? "bg-gradient-to-br from-slate-900 to-slate-700 text-white dark:from-sky-500/25 dark:to-violet-500/25 dark:text-white dark:border dark:border-sky-400/20 shadow-sm"
+                      : m.error
+                        ? "bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/25 dark:text-rose-200"
+                        : "bg-gradient-to-br from-surface to-violet-50/60 dark:to-violet-500/5 border border-border text-primary"
                   }`}
                 >
                   {m.content}
@@ -478,7 +504,7 @@ export default function ChatView({ chatId }: { chatId?: string }) {
                             e.preventDefault();
                             setOverlay({ source: s, index: i });
                           }}
-                          className="text-xs px-2 py-0.5 rounded-full border border-border text-secondary hover:text-primary max-w-full truncate"
+                          className="text-xs px-2 py-0.5 rounded-full border max-w-full truncate transition duration-200 hover:-translate-y-0.5 hover:shadow-sm bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/25"
                         >
                           [{i + 1}] {s.title}
                         </a>
@@ -492,10 +518,12 @@ export default function ChatView({ chatId }: { chatId?: string }) {
                         onClick={() => copy(m)}
                         title="Copy answer"
                         aria-label="Copy answer"
-                        className="h-7 px-1.5 inline-flex items-center gap-1 rounded-md text-xs hover:text-primary hover:bg-background transition"
+                        className="group h-7 inline-flex items-center gap-1 rounded-full text-xs transition"
                       >
-                        {copiedId === m.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedId === m.id && <span>Copied</span>}
+                        <span className={`icon-bubble w-7 h-7 transition duration-200 group-hover:scale-110 ${copiedId === m.id ? TONES.green.bubble : TONES.blue.bubble}`}>
+                          {copiedId === m.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        </span>
+                        {copiedId === m.id && <span className={`${TONES.green.text} animate-fade-in`}>Copied</span>}
                       </button>
                       {guest === false && !m.local && (
                         <>
@@ -505,8 +533,8 @@ export default function ChatView({ chatId }: { chatId?: string }) {
                             title="Good answer"
                             aria-label="Good answer"
                             aria-pressed={m.myVote === "UP"}
-                            className={`h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-background transition ${
-                              m.myVote === "UP" ? "text-accent" : "hover:text-primary"
+                            className={`icon-bubble w-7 h-7 transition duration-200 hover:scale-110 ${TONES.green.bubble} ${
+                              m.myVote === "UP" ? `ring-2 ${TONES.green.ring}` : ""
                             }`}
                           >
                             <ThumbsUp className="w-3.5 h-3.5" fill={m.myVote === "UP" ? "currentColor" : "none"} />
@@ -517,8 +545,8 @@ export default function ChatView({ chatId }: { chatId?: string }) {
                             title="Bad answer"
                             aria-label="Bad answer"
                             aria-pressed={m.myVote === "DOWN"}
-                            className={`h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-background transition ${
-                              m.myVote === "DOWN" ? "text-accent" : "hover:text-primary"
+                            className={`icon-bubble w-7 h-7 transition duration-200 hover:scale-110 ${TONES.rose.bubble} ${
+                              m.myVote === "DOWN" ? `ring-2 ${TONES.rose.ring}` : ""
                             }`}
                           >
                             <ThumbsDown className="w-3.5 h-3.5" fill={m.myVote === "DOWN" ? "currentColor" : "none"} />
@@ -531,8 +559,10 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               </div>
             ))}
             {loading && (
-              <div className="flex justify-start">
-                <div className="bg-surface border border-border rounded-2xl px-4 py-3 text-sm text-secondary">
+              <div className="flex justify-start gap-2 animate-fade-up">
+                <IconBubble icon={Sparkles} tone="violet" size="sm" className="shrink-0 mt-1 animate-pulse" />
+                <div className="bg-surface border border-border rounded-2xl px-4 py-3 text-sm text-secondary inline-flex items-center gap-2">
+                  <span className="typing-dots" aria-hidden="true"><span /><span /><span /></span>
                   Searching knowledge base…
                 </div>
               </div>
@@ -560,13 +590,13 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about local history, leaders, places…"
-              className="flex-1 h-12 px-4 rounded-xl border border-border bg-surface text-primary placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-accent/20"
+              className="flex-1 h-12 px-4 rounded-xl border border-border bg-surface text-primary placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-300 dark:focus:border-violet-500/40 transition"
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="h-12 w-12 flex items-center justify-center rounded-xl bg-accent text-background disabled:opacity-40 transition"
+              className="h-12 w-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-sm hover:shadow-md hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 transition"
             >
               <Send className="w-4 h-4" />
             </button>

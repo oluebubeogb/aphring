@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowBigDown, ArrowBigUp, Bookmark, BookmarkCheck, Download, FileText, Flag, Share2, PencilLine } from "lucide-react";
 import { api, downloadFile, isLoggedIn, timeAgo } from "@/lib/api";
-import { Chip, entityHref, knowledgeTypeCls } from "@/components/ui";
+import { Chip, entityHref } from "@/components/ui";
+import { entityTypeStyle, KnowledgeTypeIcon, TONES, type Tone } from "@/components/Colorful";
 
 export interface RecordEntity {
   id: string;
@@ -116,50 +117,77 @@ export function useRecordActions(initial: PublicRecord) {
   return { rec, setRec, msg, flash, vote, save, share, downloadMd, downloadSource, report };
 }
 
+/** Small round action button with its own soft hue; stronger when active. */
+function ActBtn({
+  tone,
+  active,
+  label,
+  onClick,
+  title,
+  children,
+}: {
+  tone: Tone;
+  active?: boolean;
+  label?: React.ReactNode;
+  onClick?: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button type="button" className={`act-btn group ${active ? TONES[tone].text + " font-medium" : ""}`} onClick={onClick} title={title} aria-label={title} aria-pressed={active}>
+      <span className={`icon-bubble w-7 h-7 transition duration-200 group-hover:scale-110 ${TONES[tone].bubble} ${active ? `ring-2 ${TONES[tone].ring}` : ""}`}>
+        {children}
+      </span>
+      {label !== undefined && label !== "" && label !== false && <span>{label}</span>}
+    </button>
+  );
+}
+
 export function ActionBar({ a, full }: { a: ReturnType<typeof useRecordActions>; full?: boolean }) {
   const { rec } = a;
   const verified = rec.status === "VERIFIED";
   const docs = Array.from(new Map(rec.citations.filter((c) => c.document).map((c) => [c.document!.id, c.document!])).values());
-  const btn = "inline-flex items-center gap-1 px-2 h-8 rounded-md text-sm text-secondary hover:text-primary hover:bg-surface transition";
+  const ic = "w-3.5 h-3.5";
   return (
     <div className="flex flex-wrap items-center gap-1">
       {verified && (
         <>
-          <button className={`${btn} ${rec.myVote === "UP" ? "text-green-600" : ""}`} onClick={() => a.vote("UP")} title="Upvote">
-            <ArrowBigUp className="w-4 h-4" /> {rec.upvotes}
-          </button>
-          <button className={`${btn} ${rec.myVote === "DOWN" ? "text-red-600" : ""}`} onClick={() => a.vote("DOWN")} title="Downvote">
-            <ArrowBigDown className="w-4 h-4" /> {rec.downvotes}
-          </button>
-          <button className={btn} onClick={a.save} title="Save">
-            {rec.saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-            {full ? (rec.saved ? "Saved" : "Save") : rec.saves || ""}
-          </button>
-          <button className={btn} onClick={a.share} title="Share">
-            <Share2 className="w-4 h-4" /> {full && "Share"}
-          </button>
+          <ActBtn tone="green" active={rec.myVote === "UP"} onClick={() => a.vote("UP")} title="Upvote" label={rec.upvotes}>
+            <ArrowBigUp className={ic} fill={rec.myVote === "UP" ? "currentColor" : "none"} />
+          </ActBtn>
+          <ActBtn tone="rose" active={rec.myVote === "DOWN"} onClick={() => a.vote("DOWN")} title="Downvote" label={rec.downvotes}>
+            <ArrowBigDown className={ic} fill={rec.myVote === "DOWN" ? "currentColor" : "none"} />
+          </ActBtn>
+          <ActBtn tone="amber" active={rec.saved} onClick={a.save} title={rec.saved ? "Saved" : "Save"} label={full ? (rec.saved ? "Saved" : "Save") : rec.saves || ""}>
+            {rec.saved ? <BookmarkCheck className={ic} /> : <Bookmark className={ic} />}
+          </ActBtn>
+          <ActBtn tone="blue" onClick={a.share} title="Share" label={full ? "Share" : ""}>
+            <Share2 className={ic} />
+          </ActBtn>
         </>
       )}
-      <button className={btn} onClick={a.downloadMd} title="Download as Markdown">
-        <Download className="w-4 h-4" /> {full && ".md"}
-      </button>
+      <ActBtn tone="teal" onClick={a.downloadMd} title="Download as Markdown" label={full ? ".md" : ""}>
+        <Download className={ic} />
+      </ActBtn>
       {full &&
         docs.map((d) => (
-          <button key={d.id} className={btn} onClick={() => a.downloadSource(d.id, d.filename)} title="Download the source file">
-            <FileText className="w-4 h-4" /> {d.filename}
-          </button>
+          <ActBtn key={d.id} tone="sky" onClick={() => a.downloadSource(d.id, d.filename)} title="Download the source file" label={d.filename}>
+            <FileText className={ic} />
+          </ActBtn>
         ))}
       {verified && (
-        <button className={btn} onClick={a.report} title="Report">
-          <Flag className="w-4 h-4" /> {full && "Report"}
-        </button>
+        <ActBtn tone="orange" onClick={a.report} title="Report" label={full ? "Report" : ""}>
+          <Flag className={ic} />
+        </ActBtn>
       )}
       {!full && verified && (
-        <Link href={`/record/${rec.id}#correct`} className={btn} title="Suggest a correction">
-          <PencilLine className="w-4 h-4" />
+        <Link href={`/record/${rec.id}#correct`} className="act-btn group" title="Suggest a correction" aria-label="Suggest a correction">
+          <span className={`icon-bubble w-7 h-7 transition duration-200 group-hover:scale-110 ${TONES.violet.bubble}`}>
+            <PencilLine className={ic} />
+          </span>
         </Link>
       )}
-      {a.msg && <span className="text-xs text-secondary ml-2">{a.msg}</span>}
+      {a.msg && <span className="text-xs text-secondary ml-2 animate-fade-in">{a.msg}</span>}
     </div>
   );
 }
@@ -168,11 +196,14 @@ export function EntityChips({ entities }: { entities: RecordEntity[] }) {
   if (!entities?.length) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
-      {entities.map((e) => (
-        <Chip key={e.id} href={entityHref(e)} title={e.entityType.toLowerCase()}>
-          {e.name}
-        </Chip>
-      ))}
+      {entities.map((e) => {
+        const st = entityTypeStyle(e.entityType);
+        return (
+          <Chip key={e.id} href={entityHref(e)} title={e.entityType.toLowerCase()} tone={st.tone} icon={st.icon}>
+            {e.name}
+          </Chip>
+        );
+      })}
     </div>
   );
 }
@@ -181,9 +212,9 @@ export default function RecordCard({ record, clamp = true }: { record: PublicRec
   const a = useRecordActions(record);
   const rec = a.rec;
   return (
-    <article className="p-4 rounded-xl border border-border bg-surface space-y-2">
+    <article className="card-lift p-4 rounded-xl border border-border bg-surface space-y-2 animate-fade-in">
       <div className="flex items-center gap-2 text-xs text-secondary flex-wrap">
-        <span className={knowledgeTypeCls}>{rec.type}</span>
+        <KnowledgeTypeIcon type={rec.type} />
         {rec.placeText && <span>· {rec.placeText}</span>}
         {rec.createdBy && (
           <>

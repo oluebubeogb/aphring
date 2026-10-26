@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Header, { useSession } from "@/components/Header";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api } from "@/lib/api";
+import { Clock, Sparkles, TrendingUp, type LucideIcon } from "lucide-react";
 import { btnGhost, Notice, Page, Tabs } from "@/components/ui";
+import type { Tone } from "@/components/Colorful";
 
 type Tab = "recent" | "top" | "foryou";
 
@@ -33,11 +35,11 @@ export default function FeedPage() {
     load(tab, 1);
   }, [tab]);
 
-  const tabs: { value: Tab; label: string }[] = [
-    { value: "recent", label: "Recent" },
-    { value: "top", label: "Top" },
+  const tabs: { value: Tab; label: string; icon: LucideIcon; tone: Tone }[] = [
+    { value: "recent", label: "Recent", icon: Clock, tone: "sky" },
+    { value: "top", label: "Top", icon: TrendingUp, tone: "emerald" },
   ];
-  if (user) tabs.push({ value: "foryou", label: "For you" });
+  if (user) tabs.push({ value: "foryou", label: "For you", icon: Sparkles, tone: "violet" });
 
   return (
     <div className="min-h-screen bg-background">

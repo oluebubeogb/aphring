@@ -49,3 +49,181 @@ body {
   background: var(--border);
   border-radius: 3px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Liveliness: colourful icon bubbles, hover lifts, soft animations    */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+  /* A coloured icon centred on a soft circular background. */
+  .icon-bubble {
+    @apply inline-flex items-center justify-center rounded-full shrink-0 transition duration-200 ease-out;
+  }
+  .hover-pop {
+    @apply transition-transform duration-200 ease-out hover:scale-110;
+  }
+
+  /* CSS tooltip used for icon-only labels (category icons). */
+  .tip-wrap {
+    @apply relative cursor-default;
+  }
+  .tip {
+    @apply pointer-events-none absolute left-1/2 top-full z-30 mt-1.5 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md
+      bg-gray-900 px-2 py-0.5 text-[11px] font-medium text-white opacity-0 shadow-md transition duration-150
+      dark:bg-gray-100 dark:text-gray-900;
+  }
+  .tip-wrap:hover .tip,
+  .tip-wrap:focus-within .tip {
+    @apply translate-y-0 opacity-100;
+  }
+
+  /* Header + chat sidebar nav items. */
+  .nav-link {
+    @apply inline-flex items-center gap-2 rounded-full px-1.5 py-1 transition-colors duration-200;
+  }
+  .nav-link:hover .nav-bubble {
+    @apply scale-110 shadow-sm;
+  }
+  .nav-bubble {
+    @apply transition-transform duration-200 ease-out;
+  }
+  .mobile-link {
+    @apply flex w-full rounded-lg px-2 py-1.5 hover:bg-surface;
+  }
+  .side-link {
+    @apply flex items-center gap-2 rounded-lg px-2 py-1.5 text-secondary transition duration-200 hover:bg-background hover:text-primary hover:translate-x-0.5;
+  }
+  .side-link:hover .nav-bubble {
+    @apply scale-110;
+  }
+
+  /* Record action buttons (vote, save, share…). */
+  .act-btn {
+    @apply inline-flex items-center gap-1 rounded-full pr-1.5 h-8 text-sm text-secondary transition duration-200 hover:text-primary;
+  }
+
+  /* Brand mark: three overlapping dots in the Aphring palette. */
+  .brand-mark {
+    @apply relative inline-block h-5 w-5 rounded-full bg-gradient-to-br from-emerald-400 via-sky-400 to-violet-500 shadow-sm transition-transform duration-500;
+  }
+  .brand-mark::after {
+    content: "";
+    @apply absolute inset-[5px] rounded-full bg-background;
+  }
+  a:hover > .brand-mark {
+    transform: rotate(180deg) scale(1.08);
+  }
+
+  .card-lift {
+    @apply transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/40;
+  }
+  .home-tile {
+    @apply transition duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/40;
+  }
+
+  .hero-blob {
+    @apply absolute rounded-full blur-3xl;
+    animation: floatSoft 14s ease-in-out infinite;
+  }
+
+  /* Rotating example question on the home search box. */
+  .rotating-placeholder {
+    opacity: 0;
+    transform: translateY(calc(-50% + 6px));
+    transition: opacity 450ms ease, transform 450ms ease;
+  }
+  .rotating-placeholder.is-visible {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+
+  .progress-grow {
+    animation: growX 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    transform-origin: left;
+  }
+
+  .typing-dots {
+    @apply inline-flex items-center gap-1;
+  }
+  .typing-dots > span {
+    @apply h-1.5 w-1.5 rounded-full bg-violet-400;
+    animation: typingDot 1.2s ease-in-out infinite;
+  }
+  .typing-dots > span:nth-child(2) {
+    background-color: rgb(56 189 248);
+    animation-delay: 0.15s;
+  }
+  .typing-dots > span:nth-child(3) {
+    background-color: rgb(52 211 153);
+    animation-delay: 0.3s;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 400ms ease both;
+  }
+  .animate-fade-up {
+    animation: fadeUp 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-slide-down {
+    animation: slideDown 220ms ease-out both;
+  }
+  .animate-float-soft {
+    animation: floatSoft 6s ease-in-out infinite;
+  }
+  .animate-twinkle {
+    animation: twinkle 2.6s ease-in-out infinite;
+  }
+  .animate-gradient-x {
+    background-size: 200% auto;
+    animation: gradientX 8s ease-in-out infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadePlaceholder {
+  0%, 100% { opacity: 0; transform: translateY(4px); }
+  12%, 88% { opacity: 1; transform: translateY(0); }
+}
+@keyframes floatSoft {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+}
+@keyframes twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: scale(1.15) rotate(12deg); opacity: 0.75; }
+}
+@keyframes gradientX {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes growX {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes typingDot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,14 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Compass, Search, Upload, Mic, Trophy, Rss } from "lucide-react";
+import { Compass, Search, Upload, Mic, Trophy, Rss, Sparkles, ArrowRight } from "lucide-react";
 import Header from "@/components/Header";
+import { IconBubble, TONES, type Tone } from "@/components/Colorful";
+
+/** Example questions that slowly rotate in the search box until the visitor starts typing. */
+const EXAMPLES = [
+  "Who served as deputy chairman of Arochukwu LGA in 2005?",
+  "When was Chinua Achebe International Airport opened?",
+  "What is the history of the Ooni of Ife?",
+  "Which schools did Nnamdi Azikiwe attend?",
+  "What does the New Yam Festival celebrate in Igboland?",
+  "Who founded the Kano Durbar tradition?",
+  "When was Government College Umuahia established?",
+  "What happened at the Aba Women's Riot of 1929?",
+];
+const ROTATE_MS = 4000;
+const FADE_MS = 450;
 
 export default function LandingPage() {
   const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
   const router = useRouter();
+
+  const paused = focused || query.length > 0;
+
+  useEffect(() => {
+    if (paused) return;
+    let fadeTimer: ReturnType<typeof setTimeout> | undefined;
+    const t = setInterval(() => {
+      setVisible(false);
+      fadeTimer = setTimeout(() => {
+        setIdx((i) => (i + 1) % EXAMPLES.length);
+        setVisible(true);
+      }, FADE_MS);
+    }, ROTATE_MS);
+    return () => {
+      clearInterval(t);
+      if (fadeTimer) clearTimeout(fadeTimer);
+      setVisible(true);
+    };
+  }, [paused]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,43 +53,85 @@ export default function LandingPage() {
     router.push(`/chat?q=${encodeURIComponent(query.trim())}`);
   };
 
-  const tiles = [
-    { icon: Compass, label: "Explore", href: "/explore", note: "People, places, schools and events from verified records" },
-    { icon: Rss, label: "Feed", href: "/feed", note: "Newly verified records to vote on, save and share" },
-    { icon: Upload, label: "Contribute", href: "/submit", note: "Upload a document or write a record" },
-    { icon: Mic, label: "Oral history", href: "/oral", note: "Upload a recording or transcript" },
-    { icon: Trophy, label: "Leaderboard", href: "/leaderboard", note: "Top contributors by verified work" },
+  const tiles: { icon: typeof Compass; label: string; href: string; note: string; tone: Tone }[] = [
+    { icon: Compass, label: "Explore", href: "/explore", note: "People, places, schools and events from verified records", tone: "emerald" },
+    { icon: Rss, label: "Feed", href: "/feed", note: "Newly verified records to vote on, save and share", tone: "sky" },
+    { icon: Upload, label: "Contribute", href: "/submit", note: "Upload a document or write a record", tone: "orange" },
+    { icon: Mic, label: "Oral history", href: "/oral", note: "Upload a recording or transcript", tone: "fuchsia" },
+    { icon: Trophy, label: "Leaderboard", href: "/leaderboard", note: "Top contributors by verified work", tone: "amber" },
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-20">
+      <main className="relative isolate flex-1 flex flex-col items-center justify-center px-6 py-20 overflow-hidden">
+        {/* Soft colour wash behind the hero */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+          <div className="hero-blob left-[8%] top-[10%] w-72 h-72 bg-emerald-300/30 dark:bg-emerald-500/10" />
+          <div className="hero-blob right-[6%] top-[18%] w-80 h-80 bg-sky-300/30 dark:bg-sky-500/10 [animation-delay:-4s]" />
+          <div className="hero-blob left-[35%] bottom-[4%] w-72 h-72 bg-amber-200/40 dark:bg-amber-500/10 [animation-delay:-8s]" />
+        </div>
         <div className="max-w-3xl w-full text-center space-y-8">
-          <div className="space-y-3">
-            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-primary">Ask Aphring</h1>
+          <div className="space-y-3 animate-fade-up">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/25">
+              <Sparkles className="w-3.5 h-3.5 animate-twinkle" /> Verified community knowledge
+            </span>
+            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-primary">
+              Ask{" "}
+              <span className="bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent animate-gradient-x">
+                Aphring
+              </span>
+            </h1>
             <p className="text-lg text-secondary">Nigeria&apos;s community knowledge network. Answers come only from verified records.</p>
           </div>
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+          <form onSubmit={handleSearch} className="relative group animate-fade-up [animation-delay:120ms]">
+            <div
+              aria-hidden="true"
+              className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-sky-400 to-violet-400 opacity-20 blur-md transition-opacity duration-500 group-hover:opacity-40 group-focus-within:opacity-50"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+              <IconBubble icon={Search} tone="violet" size="md" />
+            </span>
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Who served as deputy chairman of Arochukwu LGA in 2005?"
-              className="w-full h-14 pl-12 pr-4 rounded-xl border border-border bg-surface text-primary placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-accent/20 transition"
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              aria-label="Ask Aphring a question"
+              placeholder={paused ? EXAMPLES[idx] : ""}
+              className="relative w-full h-14 pl-14 pr-14 rounded-xl border border-border bg-surface text-primary placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
             />
+            {!query && !focused && (
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none absolute left-14 right-14 top-1/2 -translate-y-1/2 z-10 text-left text-secondary truncate rotating-placeholder ${
+                  visible ? "is-visible" : ""
+                }`}
+              >
+                {EXAMPLES[idx]}
+              </span>
+            )}
+            <button
+              type="submit"
+              aria-label="Ask"
+              disabled={!query.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-10 w-10 inline-flex items-center justify-center rounded-lg bg-accent text-background transition hover:scale-105 disabled:opacity-30 disabled:hover:scale-100"
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </form>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-6">
-            {tiles.map(({ icon: Icon, label, href, note }) => (
+            {tiles.map(({ icon, label, href, note, tone }, i) => (
               <Link
                 key={label}
                 href={href}
                 title={note}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-surface hover:border-accent/30 transition"
+                style={{ animationDelay: `${200 + i * 80}ms` }}
+                className={`home-tile group animate-fade-up flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-surface ${TONES[tone].hoverBorder}`}
               >
-                <Icon className="w-5 h-5 text-secondary" />
-                <span className="text-sm text-secondary">{label}</span>
+                <IconBubble icon={icon} tone={tone} size="lg" className="transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6" />
+                <span className="text-sm text-secondary group-hover:text-primary transition-colors">{label}</span>
               </Link>
             ))}
           </div>

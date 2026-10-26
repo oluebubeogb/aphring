@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
+import { IconBubble, TONES, type Tone } from "@/components/Colorful";
+
+export { KnowledgeTypeIcon } from "@/components/Colorful";
 
 export const inputCls =
   "w-full h-11 px-3 rounded-lg border border-border bg-surface text-primary placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-accent/20";
@@ -25,15 +29,40 @@ export function Notice({ kind = "info", children }: { kind?: "info" | "error" | 
   return <div className={`text-sm px-3 py-2 rounded-lg border ${cls}`}>{children}</div>;
 }
 
-export function Chip({ children, href, title }: { children: React.ReactNode; href?: string; title?: string }) {
-  const cls = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border text-xs text-secondary";
-  return href ? (
-    <Link href={href} className={`${cls} hover:text-primary hover:border-accent/40`} title={title}>
+export function Chip({
+  children,
+  href,
+  title,
+  tone,
+  icon,
+}: {
+  children: React.ReactNode;
+  href?: string;
+  title?: string;
+  /** Soft tinted pill colour (defaults to the plain grey outline). */
+  tone?: Tone;
+  icon?: LucideIcon;
+}) {
+  const Icon = icon;
+  const colour = tone ? `${TONES[tone].soft}` : "border-border text-secondary";
+  const cls = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs transition duration-200 ${colour}`;
+  const inner = (
+    <>
+      {Icon && <Icon className="w-3 h-3 shrink-0" />}
       {children}
+    </>
+  );
+  return href ? (
+    <Link
+      href={href}
+      className={`${cls} hover:-translate-y-0.5 hover:shadow-sm ${tone ? "hover:brightness-95 dark:hover:brightness-125" : "hover:text-primary hover:border-accent/40"}`}
+      title={title}
+    >
+      {inner}
     </Link>
   ) : (
     <span className={cls} title={title}>
-      {children}
+      {inner}
     </span>
   );
 }
@@ -53,29 +82,58 @@ export function Tabs<T extends string>({
   value,
   onChange,
 }: {
-  tabs: { value: T; label: string; badge?: number }[];
+  tabs: { value: T; label: string; badge?: number; icon?: LucideIcon; tone?: Tone }[];
   value: T;
   onChange: (v: T) => void;
 }) {
   return (
     <div className="flex gap-1 border-b border-border overflow-x-auto">
-      {tabs.map((t) => (
-        <button
-          key={t.value}
-          onClick={() => onChange(t.value)}
-          className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition ${
-            value === t.value ? "border-accent text-primary font-medium" : "border-transparent text-secondary hover:text-primary"
-          }`}
-        >
-          {t.label}
-          {t.badge ? <span className="ml-1.5 text-xs px-1.5 rounded-full bg-surface border border-border">{t.badge}</span> : null}
-        </button>
-      ))}
+      {tabs.map((t) => {
+        const active = value === t.value;
+        const tone = t.tone || "violet";
+        return (
+          <button
+            key={t.value}
+            onClick={() => onChange(t.value)}
+            className={`group inline-flex items-center gap-2 px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition duration-200 ${
+              active ? `${TAB_BORDER[tone]} text-primary font-medium` : "border-transparent text-secondary hover:text-primary"
+            }`}
+          >
+            {t.icon && (
+              <IconBubble
+                icon={t.icon}
+                tone={tone}
+                size="xs"
+                className={`transition-transform duration-200 group-hover:scale-110 ${active ? "" : "opacity-80 group-hover:opacity-100"}`}
+              />
+            )}
+            {t.label}
+            {t.badge ? <span className="ml-0.5 text-xs px-1.5 rounded-full bg-surface border border-border">{t.badge}</span> : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-/** Record category label (person, history, traditional, …) — bold small-caps, not entity names. */
+const TAB_BORDER: Record<Tone, string> = {
+  emerald: "border-emerald-500",
+  sky: "border-sky-500",
+  violet: "border-violet-500",
+  amber: "border-amber-500",
+  yellow: "border-yellow-500",
+  slate: "border-slate-500",
+  rose: "border-rose-500",
+  teal: "border-teal-500",
+  orange: "border-orange-500",
+  indigo: "border-indigo-500",
+  fuchsia: "border-fuchsia-500",
+  blue: "border-blue-500",
+  green: "border-green-500",
+  gray: "border-gray-500",
+};
+
+/** Text style for record category names — now only used where a text label is still wanted (forms). Display pages use <KnowledgeTypeIcon>. */
 export const knowledgeTypeCls = "font-bold uppercase tracking-wide [font-variant:small-caps]";
 
 export function entityHref(e: { type?: string; entityType?: string; slug: string }) {

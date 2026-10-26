@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { Notice, knowledgeTypeCls } from "@/components/ui";
+import { Notice, KnowledgeTypeIcon } from "@/components/ui";
 import { EntityChips, type PublicRecord } from "@/components/RecordCard";
 
 export interface SourceRef {
@@ -60,9 +60,9 @@ export default function SourceOverlay({ source, index, onClose }: { source: Sour
       <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl border border-border bg-background shadow-xl overflow-hidden">
         <div className="flex items-start gap-3 px-5 pt-5 pb-3 border-b border-border min-w-0">
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-secondary">
-              {index !== undefined && <span className="mr-1">[{index + 1}]</span>}
-              <span className={knowledgeTypeCls}>{type}</span>
+            <p className="text-xs text-secondary flex items-center gap-1.5 flex-wrap">
+              {index !== undefined && <span>[{index + 1}]</span>}
+              <KnowledgeTypeIcon type={type} />
               {rec?.placeText && <span> · {rec.placeText}</span>}
             </p>
             <h2 id="source-overlay-title" className="text-lg font-semibold text-primary mt-0.5 break-words [overflow-wrap:anywhere]">

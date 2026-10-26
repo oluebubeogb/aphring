@@ -6,7 +6,7 @@ import Link from "next/link";
 import Header, { useSession } from "@/components/Header";
 import { ActionBar, EntityChips, useRecordActions, type PublicRecord } from "@/components/RecordCard";
 import { api, isLoggedIn, KNOWLEDGE_TYPES, timeAgo } from "@/lib/api";
-import { btnGhost, btnPrimary, inputCls, Notice, Page, StatusPill, textareaCls, knowledgeTypeCls } from "@/components/ui";
+import { btnGhost, btnPrimary, inputCls, Notice, Page, StatusPill, textareaCls, KnowledgeTypeIcon } from "@/components/ui";
 
 type Full = PublicRecord & { revisions: number; reviewNote?: string | null };
 interface Correction {
@@ -93,7 +93,7 @@ function RecordView({ initial }: { initial: Full }) {
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-xs text-secondary flex-wrap">
           <StatusPill status={rec.status} />
-          <span className={knowledgeTypeCls}>{rec.type}</span>
+          <KnowledgeTypeIcon type={rec.type} />
           {rec.placeText && <span>· {rec.placeText}</span>}
           {rec.createdBy && (
             <>

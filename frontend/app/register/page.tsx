@@ -58,7 +58,6 @@ export default function RegisterPage() {
               autoComplete="username"
               className={inputCls}
             />
-            <p className="text-xs text-secondary mt-1">Shown publicly on your records and the leaderboard. 3–30 letters, numbers or _.</p>
           </div>
           <div>
             <label className="block text-sm text-secondary mb-1.5">Email</label>
