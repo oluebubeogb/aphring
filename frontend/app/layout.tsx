@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { Baloo_Da_2 } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
+
+// Brand wordmark font ("Baloo Da" now ships as "Baloo Da 2"); self-hosted by next/font.
+const brandFont = Baloo_Da_2({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-brand", display: "swap" });
 
 export const metadata: Metadata = {
   title: "aphring — Nigeria's Community Knowledge Network",
@@ -24,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={brandFont.variable}>
       <body className="min-h-screen antialiased">
         <ThemeProvider>
           <ChunkLoadRecovery />

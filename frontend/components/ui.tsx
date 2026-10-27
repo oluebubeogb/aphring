@@ -164,10 +164,14 @@ export function PageTitle({ icon, tone, title, subtitle }: { icon: LucideIcon; t
   );
 }
 
-/** Aphring pyramid mark (public/aphring-mark.png) shown beside the wordmark. */
-export function BrandMark({ className = "h-7 w-7" }: { className?: string }) {
+/**
+ * Aphring pyramid mark beside the wordmark. Uses a tightly-cropped PNG (no transparent
+ * padding) so that, inside `.brand-lockup` (inline-flex items-baseline), the image's bottom
+ * edge lands exactly on the text baseline instead of floating above it.
+ */
+export function BrandMark({ className = "" }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/aphring-mark.png" alt="" aria-hidden="true" width={28} height={28} className={`brand-mark ${className}`} />;
+  return <img src="/aphring-mark-tight.png" alt="" aria-hidden="true" width={63} height={32} className={`brand-mark ${className}`} />;
 }
 
 /** Brand + icon header used on login / register / password pages. */
@@ -175,9 +179,9 @@ export function AuthHeader({ icon, tone, subtitle }: { icon: LucideIcon; tone: T
   return (
     <div className="text-center flex flex-col items-center gap-3 animate-fade-up">
       <IconBubble icon={icon} tone={tone} size="lg" className="animate-float-soft" />
-      <Link href="/" className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight text-primary">
+      <Link href="/" className="brand-lockup text-3xl">
         <BrandMark />
-        aphring
+        <span className="brand-word">aphring</span>
       </Link>
       <p className="text-secondary text-sm">{subtitle}</p>
     </div>

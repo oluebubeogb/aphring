@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
-import { BadgeList, MilestoneList, StatsGrid, type Badge, type Milestone, type Stats } from "@/components/Badges";
+import { BadgeList, MilestoneList, SectionHeading, SECTION_ICONS, StatsGrid, type Badge, type Milestone, type Stats } from "@/components/Badges";
 import { api, isLoggedIn, storeUser, timeAgo } from "@/lib/api";
 import { btnGhost, btnPrimary, Notice, Page, StatusPill, Tabs } from "@/components/ui";
 import { WithPinRail } from "@/components/PinRail";
@@ -124,15 +124,15 @@ export default function MePage() {
             )}
 
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Verified work</h2>
+              <SectionHeading icon={SECTION_ICONS.work}>Verified work</SectionHeading>
               <StatsGrid stats={p.stats} />
             </section>
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Badges</h2>
+              <SectionHeading icon={SECTION_ICONS.badges}>Badges</SectionHeading>
               <BadgeList badges={p.badges} />
             </section>
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Milestones</h2>
+              <SectionHeading icon={SECTION_ICONS.milestones}>Milestones</SectionHeading>
               <MilestoneList milestones={p.milestones} />
             </section>
 

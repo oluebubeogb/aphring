@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
-import { BadgeList, MilestoneList, StatsGrid, type Badge, type Milestone, type Stats } from "@/components/Badges";
+import { BadgeList, MilestoneList, SectionHeading, SECTION_ICONS, StatsGrid, type Badge, type Milestone, type Stats } from "@/components/Badges";
 import { api, timeAgo } from "@/lib/api";
 import { Notice, Page } from "@/components/ui";
 import { WithPinRail } from "@/components/PinRail";
@@ -47,15 +47,15 @@ export default function UserPage() {
             </div>
             <StatsGrid stats={p.stats} />
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Badges</h2>
+              <SectionHeading icon={SECTION_ICONS.badges}>Badges</SectionHeading>
               <BadgeList badges={p.badges} />
             </section>
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Milestones</h2>
+              <SectionHeading icon={SECTION_ICONS.milestones}>Milestones</SectionHeading>
               <MilestoneList milestones={p.milestones} />
             </section>
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold">Recently verified</h2>
+              <SectionHeading icon={SECTION_ICONS.recent}>Recently verified</SectionHeading>
               {p.recent.length === 0 && <p className="text-sm text-secondary">No verified records yet. <a href="/submit" className="underline hover:text-primary">Contribute</a> to get started.</p>}
               <ul className="divide-y divide-border border border-border rounded-xl bg-surface">
                 {p.recent.map((r) => (

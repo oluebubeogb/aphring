@@ -117,7 +117,7 @@ export function useRecordActions(initial: PublicRecord) {
   return { rec, setRec, msg, flash, vote, save, share, downloadMd, downloadSource, report };
 }
 
-/** Small round action button with its own soft hue; stronger when active. */
+/** Small round action button. Votes keep green/red; other actions are calm gray. */
 function ActBtn({
   tone,
   active,
@@ -158,31 +158,31 @@ export function ActionBar({ a, full }: { a: ReturnType<typeof useRecordActions>;
           <ActBtn tone="rose" active={rec.myVote === "DOWN"} onClick={() => a.vote("DOWN")} title="Downvote" label={rec.downvotes}>
             <ArrowBigDown className={ic} fill={rec.myVote === "DOWN" ? "currentColor" : "none"} />
           </ActBtn>
-          <ActBtn tone="amber" active={rec.saved} onClick={a.save} title={rec.saved ? "Saved" : "Save"} label={full ? (rec.saved ? "Saved" : "Save") : rec.saves || ""}>
+          <ActBtn tone="gray" active={rec.saved} onClick={a.save} title={rec.saved ? "Saved" : "Save"} label={full ? (rec.saved ? "Saved" : "Save") : rec.saves || ""}>
             {rec.saved ? <BookmarkCheck className={ic} /> : <Bookmark className={ic} />}
           </ActBtn>
-          <ActBtn tone="blue" onClick={a.share} title="Share" label={full ? "Share" : ""}>
+          <ActBtn tone="gray" onClick={a.share} title="Share" label={full ? "Share" : ""}>
             <Share2 className={ic} />
           </ActBtn>
         </>
       )}
-      <ActBtn tone="teal" onClick={a.downloadMd} title="Download as Markdown" label={full ? ".md" : ""}>
+      <ActBtn tone="gray" onClick={a.downloadMd} title="Download as Markdown" label={full ? ".md" : ""}>
         <Download className={ic} />
       </ActBtn>
       {full &&
         docs.map((d) => (
-          <ActBtn key={d.id} tone="sky" onClick={() => a.downloadSource(d.id, d.filename)} title="Download the source file" label={d.filename}>
+          <ActBtn key={d.id} tone="gray" onClick={() => a.downloadSource(d.id, d.filename)} title="Download the source file" label={d.filename}>
             <FileText className={ic} />
           </ActBtn>
         ))}
       {verified && (
-        <ActBtn tone="orange" onClick={a.report} title="Report" label={full ? "Report" : ""}>
+        <ActBtn tone="gray" onClick={a.report} title="Report" label={full ? "Report" : ""}>
           <Flag className={ic} />
         </ActBtn>
       )}
       {!full && verified && (
         <Link href={`/record/${rec.id}#correct`} className="act-btn group" title="Suggest a correction" aria-label="Suggest a correction">
-          <span className={`icon-bubble w-7 h-7 transition duration-200 group-hover:scale-110 ${TONES.violet.bubble}`}>
+          <span className={`icon-bubble w-7 h-7 transition duration-200 group-hover:scale-110 ${TONES.gray.bubble}`}>
             <PencilLine className={ic} />
           </span>
         </Link>
@@ -199,7 +199,7 @@ export function EntityChips({ entities }: { entities: RecordEntity[] }) {
       {entities.map((e) => {
         const st = entityTypeStyle(e.entityType);
         return (
-          <Chip key={e.id} href={entityHref(e)} title={e.entityType.toLowerCase()} tone={st.tone} icon={st.icon}>
+          <Chip key={e.id} href={entityHref(e)} title={e.entityType.toLowerCase()} icon={st.icon}>
             {e.name}
           </Chip>
         );

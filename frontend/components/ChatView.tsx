@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, MessageSquare, Send, Menu, X, Compass, Copy, Check, ThumbsUp, ThumbsDown, Rss, User, LayoutDashboard, Moon, Sun, LogOut, Sparkles, LogIn, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, MessageSquare, Send, Menu, X, Compass, Copy, Check, ThumbsUp, ThumbsDown, Rss, User, LayoutDashboard, Moon, Sun, LogOut, Sparkles, LogIn } from "lucide-react";
 import { IconBubble, TONES } from "@/components/Colorful";
 import EmptyContribute from "@/components/EmptyContribute";
 import { api, isLoggedIn, clearToken, isStaff, getStoredUser } from "@/lib/api";
@@ -106,6 +106,18 @@ export default function ChatView({ chatId }: { chatId?: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Desktop: chat-history sidebar can be collapsed; remembered in localStorage.
   const [collapsed, setCollapsed] = useState(false);
+  // Collapsed (desktop only) = icon-only rail; labels appear as a floating tip on hover / focus.
+  const [railTip, setRailTip] = useState<{ label: string; top: number; left: number } | null>(null);
+  const tipProps = (label: string) => {
+    if (!collapsed) return {};
+    const show = (e: React.SyntheticEvent<HTMLElement>) => {
+      if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      setRailTip({ label, top: r.top + r.height / 2, left: r.right + 8 });
+    };
+    const hide = () => setRailTip(null);
+    return { onMouseEnter: show, onFocus: show, onMouseLeave: hide, onBlur: hide, "aria-label": label };
+  };
   useEffect(() => {
     try {
       setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "1");
@@ -113,6 +125,7 @@ export default function ChatView({ chatId }: { chatId?: string }) {
   }, []);
   const toggleCollapsed = (v: boolean) => {
     setCollapsed(v);
+    setRailTip(null);
     try {
       localStorage.setItem(SIDEBAR_KEY, v ? "1" : "0");
     } catch {}
@@ -339,12 +352,12 @@ export default function ChatView({ chatId }: { chatId?: string }) {
       <aside
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 ${collapsed ? "md:hidden" : ""} fixed md:static z-30 w-64 shrink-0 h-full border-r border-border bg-surface flex flex-col transition-transform`}
+        } md:translate-x-0 fixed md:static z-30 w-64 ${collapsed ? "md:w-16" : ""} shrink-0 h-full border-r border-border bg-surface flex flex-col transition-[transform,width] duration-200`}
       >
-        <div className="p-4 flex items-center justify-between border-b border-border">
-          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
+        <div className={`p-4 flex items-center justify-between gap-2 border-b border-border ${collapsed ? "md:flex-col md:px-2 md:py-3" : ""}`}>
+          <Link href="/" className="brand-lockup text-lg" {...tipProps("aphring home")}>
             <BrandMark />
-            <span className="text-primary">aphring</span>
+            <span className={`brand-word ${collapsed ? "md:hidden" : ""}`}>aphring</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -354,27 +367,30 @@ export default function ChatView({ chatId }: { chatId?: string }) {
             <X className="w-5 h-5" />
           </button>
           <button
-            onClick={() => toggleCollapsed(true)}
-            className="hidden md:inline-flex group text-secondary hover:text-primary"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
+            onClick={() => toggleCollapsed(!collapsed)}
+            className="hidden md:inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-background transition group"
+            title={collapsed ? undefined : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            {...tipProps("Expand sidebar")}
           >
-            <IconBubble icon={PanelLeftClose} tone="slate" size="sm" className="nav-bubble transition-transform duration-200 group-hover:scale-110" />
+            <SidebarToggleIcon />
           </button>
         </div>
 
-        <div className="p-3">
+        <div className={`p-3 ${collapsed ? "md:px-2" : ""}`}>
           <button
             onClick={newChat}
-            className="group w-full flex items-center gap-2 px-2 py-2 rounded-lg border border-border text-sm font-medium hover:bg-background hover:border-violet-300 dark:hover:border-violet-500/40 hover:shadow-sm transition"
+            {...tipProps("New Chat")}
+            className={`group w-full flex items-center gap-2 px-2 py-2 rounded-lg border border-border text-sm font-medium hover:bg-background hover:border-violet-300 dark:hover:border-violet-500/40 hover:shadow-sm transition ${collapsed ? "md:justify-center md:px-0" : ""}`}
           >
             <IconBubble icon={Plus} tone="violet" size="sm" className="transition-transform duration-300 group-hover:rotate-90" />
-            New Chat
+            <span className={collapsed ? "md:hidden" : ""}>New Chat</span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 space-y-1">
-          <p className="text-xs text-secondary px-2 py-1 uppercase tracking-wide">
+        <div className={`flex-1 overflow-y-auto overflow-x-hidden px-3 space-y-1 ${collapsed ? "md:px-2" : ""}`}>
+          <p className={`text-xs text-secondary px-2 py-1 uppercase tracking-wide ${collapsed ? "md:hidden" : ""}`}>
             Recent
           </p>
           {chats.map((c) => (
@@ -382,9 +398,10 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               key={c.id}
               href={`/chat/${c.id}`}
               onClick={() => setSidebarOpen(false)}
-              title={c.title}
+              title={collapsed ? undefined : c.title}
+              {...tipProps(c.title)}
               aria-current={activeChat === c.id ? "page" : undefined}
-              className={`group flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-lg text-sm transition duration-200 hover:translate-x-0.5 ${
+              className={`group flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-lg text-sm transition duration-200 hover:translate-x-0.5 ${collapsed ? "md:justify-center md:px-0 md:hover:translate-x-0" : ""} ${
                 activeChat === c.id
                   ? "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-200"
                   : "text-secondary hover:bg-background hover:text-primary"
@@ -393,58 +410,76 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               <IconBubble
                 icon={MessageSquare}
                 tone={activeChat === c.id ? "violet" : "slate"}
-                size="xs"
+                size={collapsed ? "sm" : "xs"}
                 className={`shrink-0 ${activeChat === c.id ? "" : "opacity-70 group-hover:opacity-100"}`}
               />
-              <span className="truncate">{c.title}</span>
+              <span className={`truncate ${collapsed ? "md:hidden" : ""}`}>{c.title}</span>
             </Link>
           ))}
         </div>
 
-        <div className="p-3 border-t border-border space-y-0.5 text-sm">
-          <Link href="/explore" className="side-link group">
-            <IconBubble icon={Compass} tone="emerald" size="sm" className="nav-bubble" />
-            Explore
-          </Link>
-          <Link href="/feed" className="side-link group">
-            <IconBubble icon={Rss} tone="sky" size="sm" className="nav-bubble" />
-            Feed
-          </Link>
-          <Link href="/me" className="side-link group">
-            <IconBubble icon={User} tone="teal" size="sm" className="nav-bubble" />
-            My profile
-          </Link>
-          {staff && (
-            <Link href="/workstation" className="side-link group">
-              <IconBubble icon={LayoutDashboard} tone="slate" size="sm" className="nav-bubble" />
-              Workstation
-            </Link>
-          )}
-          <button onClick={toggle} className="side-link group w-full text-left">
-            <IconBubble icon={theme === "light" ? Moon : Sun} tone={theme === "light" ? "indigo" : "yellow"} size="sm" className="nav-bubble group-hover:rotate-12" />
-            {theme === "light" ? "Dark mode" : "Light mode"}
-          </button>
-          <button
-            onClick={() => {
-              clearToken();
-              router.push("/");
-            }}
-            className="side-link group w-full text-left"
-          >
-            <IconBubble icon={LogOut} tone="rose" size="sm" className="nav-bubble" />
-            Sign out
-          </button>
+        <div className={`p-3 border-t border-border space-y-0.5 text-sm ${collapsed ? "md:px-2" : ""}`}>
+          {(() => {
+            const item = collapsed ? "md:justify-center md:px-0 md:hover:translate-x-0" : "";
+            const label = collapsed ? "md:hidden" : "";
+            return (
+              <>
+                <Link href="/explore" className={`side-link group ${item}`} {...tipProps("Explore")}>
+                  <IconBubble icon={Compass} tone="emerald" size="sm" className="nav-bubble" />
+                  <span className={label}>Explore</span>
+                </Link>
+                <Link href="/feed" className={`side-link group ${item}`} {...tipProps("Feed")}>
+                  <IconBubble icon={Rss} tone="sky" size="sm" className="nav-bubble" />
+                  <span className={label}>Feed</span>
+                </Link>
+                <Link href="/me" className={`side-link group ${item}`} {...tipProps("My profile")}>
+                  <IconBubble icon={User} tone="teal" size="sm" className="nav-bubble" />
+                  <span className={label}>My profile</span>
+                </Link>
+                {staff && (
+                  <Link href="/workstation" className={`side-link group ${item}`} {...tipProps("Workstation")}>
+                    <IconBubble icon={LayoutDashboard} tone="slate" size="sm" className="nav-bubble" />
+                    <span className={label}>Workstation</span>
+                  </Link>
+                )}
+                <button onClick={toggle} className={`side-link group w-full text-left ${item}`} {...tipProps(theme === "light" ? "Dark mode" : "Light mode")}>
+                  <IconBubble icon={theme === "light" ? Moon : Sun} tone={theme === "light" ? "indigo" : "yellow"} size="sm" className="nav-bubble group-hover:rotate-12" />
+                  <span className={label}>{theme === "light" ? "Dark mode" : "Light mode"}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    clearToken();
+                    router.push("/");
+                  }}
+                  className={`side-link group w-full text-left ${item}`}
+                  {...tipProps("Sign out")}
+                >
+                  <IconBubble icon={LogOut} tone="rose" size="sm" className="nav-bubble" />
+                  <span className={label}>Sign out</span>
+                </button>
+              </>
+            );
+          })()}
         </div>
       </aside>
+      )}
+      {railTip && collapsed && (
+        <span
+          role="tooltip"
+          className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap max-w-xs truncate rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-md animate-fade-in dark:bg-gray-100 dark:text-gray-900"
+          style={{ top: railTip.top, left: railTip.left }}
+        >
+          {railTip.label}
+        </span>
       )}
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-border flex items-center px-4 gap-3">
           {guest ? (
-            <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
+            <Link href="/" className="brand-lockup text-lg">
               <BrandMark />
-              <span className="text-primary">aphring</span>
+              <span className="brand-word">aphring</span>
             </Link>
           ) : (
             <>
@@ -455,16 +490,6 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              {collapsed && (
-                <button
-                  onClick={() => toggleCollapsed(false)}
-                  className="hidden md:inline-flex group text-secondary hover:text-primary"
-                  title="Show chats"
-                  aria-label="Show chats sidebar"
-                >
-                  <IconBubble icon={PanelLeftOpen} tone="violet" size="sm" className="nav-bubble transition-transform duration-200 group-hover:scale-110" />
-                </button>
-              )}
             </>
           )}
           <span className="text-sm text-secondary truncate flex-1">
@@ -652,4 +677,10 @@ export default function ChatView({ chatId }: { chatId?: string }) {
       {overlay && <SourceOverlay source={overlay.source} index={overlay.index} onClose={closeOverlay} />}
     </div>
   );
+}
+
+/** Sidebar collapse / expand glyph (public/icon-sidebar-collapse.png) — same asset both ways. */
+function SidebarToggleIcon() {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/icon-sidebar-collapse.png" alt="" aria-hidden="true" width={20} height={20} className="w-5 h-5 opacity-80 transition group-hover:opacity-100 group-hover:scale-110 dark:invert" />;
 }

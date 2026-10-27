@@ -64,11 +64,9 @@ export default function Header() {
     <header className="border-b border-border bg-background/70 backdrop-blur sticky top-0 z-20">
       <div className="h-px w-full bg-slate-300/40 dark:bg-white/5" aria-hidden="true" />
       <div className={`${appShell} h-14 flex items-center justify-between gap-4`}>
-        <Link href="/" className="group inline-flex items-center gap-2 font-semibold text-lg tracking-tight">
+        <Link href="/" className="brand-lockup group text-xl">
           <BrandMark />
-          <span className="text-primary">
-            aphring
-          </span>
+          <span className="brand-word">aphring</span>
         </Link>
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 text-sm">
           {links.map((l) => (

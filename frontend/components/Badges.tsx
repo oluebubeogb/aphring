@@ -1,4 +1,4 @@
-import { Award, CheckCircle2, ClipboardCheck, FileText, FolderOpen, PencilLine, ThumbsUp, type LucideIcon } from "lucide-react";
+import { Award, BadgeCheck, Flag, History, CheckCircle2, ClipboardCheck, FileText, FolderOpen, PencilLine, ThumbsUp, type LucideIcon } from "lucide-react";
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
 
 /** Colour + icon per milestone ladder / stat (keys match the backend's badge ladders). */
@@ -106,8 +106,8 @@ export function MilestoneList({ milestones }: { milestones: Milestone[] }) {
               {m.next ? ` / ${m.next.toLocaleString()} → ${m.nextBadge}` : " · all reached"}
             </span>
           </div>
-          <div className="h-2 rounded-full bg-surface border border-border overflow-hidden">
-            <div className={`h-full rounded-full progress-grow ${TONES[st.tone].bar}`} style={{ width: `${Math.round(m.progress * 100)}%` }} />
+          <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-border overflow-hidden">
+            <div className="h-full rounded-full progress-grow bg-zinc-400 dark:bg-zinc-500" style={{ width: `${Math.round(m.progress * 100)}%` }} />
           </div>
         </div>
         );
@@ -115,3 +115,15 @@ export function MilestoneList({ milestones }: { milestones: Milestone[] }) {
     </div>
   );
 }
+
+/** Section heading with a calm gray icon (profile pages). */
+export function SectionHeading({ icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <h2 className="text-lg font-semibold inline-flex items-center gap-2">
+      <IconBubble icon={icon} tone="gray" size="sm" />
+      {children}
+    </h2>
+  );
+}
+
+export const SECTION_ICONS = { badges: BadgeCheck, milestones: Flag, recent: History, work: CheckCircle2 } as const;

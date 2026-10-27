@@ -105,6 +105,21 @@ body::before {
   background-color: rgb(var(--tone-rgb) / calc(var(--icon-bubble-opacity) * 2.2));
 }
 
+/* Gray until hovered/focused, then the element's own tone returns (leaderboard milestones). */
+.calm-until-hover,
+.calm-until-hover * {
+  transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease;
+}
+.calm-until-hover:not(:hover):not(:focus-visible),
+.calm-until-hover:not(:hover):not(:focus-visible) * {
+  --tone-rgb: 156 163 175 !important;
+  color: rgb(107 114 128) !important;
+}
+.dark .calm-until-hover:not(:hover):not(:focus-visible),
+.dark .calm-until-hover:not(:hover):not(:focus-visible) * {
+  color: rgb(161 161 170) !important;
+}
+
 /* Minimal scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -172,11 +187,27 @@ body::before {
 
   /* Brand mark: three overlapping dots in the Aphring palette. */
   /* Aphring pyramid mark beside the wordmark. */
+  /* Pyramid + "aphring" wordmark. items-baseline puts the (tightly cropped) image's bottom
+     edge on the text baseline, so the mark sits on the same line as the letters. */
+  .brand-lockup {
+    @apply inline-flex items-baseline text-primary;
+    gap: 0.32em;
+    line-height: 1;
+  }
+  .brand-word {
+    font-family: var(--font-brand), "Baloo Da 2", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
   .brand-mark {
-    @apply inline-block shrink-0 object-contain select-none transition-transform duration-500;
+    @apply inline-block shrink-0 select-none transition-transform duration-500;
+    height: 0.7em; /* a bit taller than x-height, roughly the old visible pyramid size */
+    width: auto;
+    transform-origin: 50% 100%;
   }
   a:hover > .brand-mark {
-    transform: translateY(-1px) scale(1.08);
+    transform: scale(1.08); /* grows from its base, never lifts off the baseline */
   }
 
   .card-lift {
