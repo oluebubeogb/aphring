@@ -206,7 +206,7 @@ export default function RecordPage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail context={rec ? { entityIds: rec.entities.map((e) => e.id), types: [rec.type], excludeRecordId: rec.id } : undefined}>
-      <Page>
+      <Page fill>
         {error && <Notice>{error}</Notice>}
         {!rec && !error && <p className="text-secondary">Loading…</p>}
         {rec && <RecordView key={rec.id} initial={rec} />}

@@ -37,8 +37,8 @@ function ResetForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-8">
+    <div className="min-h-screen flex items-center justify-center px-6 py-16 sm:py-24 md:py-32">
+      <div className="w-full max-w-sm space-y-10">
         <div className="text-center">
           <Link href="/" className="text-2xl font-semibold tracking-tight">
             aphring

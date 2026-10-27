@@ -28,8 +28,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-8">
+    <div className="min-h-screen flex items-center justify-center px-6 py-16 sm:py-24 md:py-32">
+      <div className="w-full max-w-sm space-y-10">
         <AuthHeader icon={KeyRound} tone="amber" subtitle="Reset your password" />
         <form onSubmit={submit} className="space-y-4">
           <p className="text-sm text-secondary">

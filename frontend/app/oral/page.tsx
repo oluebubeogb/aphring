@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Mic } from "lucide-react";
+import { WithPinRail } from "@/components/PinRail";
 import Header from "@/components/Header";
 import { api, isLoggedIn, KNOWLEDGE_TYPES } from "@/lib/api";
 import { btnPrimary, inputCls, Notice, Page, textareaCls } from "@/components/ui";
@@ -47,7 +48,8 @@ export default function OralHistoryPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      <Page>
+      <WithPinRail>
+      <Page fill>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Oral history</h1>
         <p className="text-secondary mb-8">
           Upload a recording (MP3, M4A, WAV, OGG, WebM · max 25 MB). Paste a transcript if you have one; otherwise it is
@@ -94,6 +96,7 @@ export default function OralHistoryPage() {
           )}
         </div>
       </Page>
+      </WithPinRail>
     </div>
   );
 }

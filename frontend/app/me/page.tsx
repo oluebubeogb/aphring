@@ -83,7 +83,7 @@ export default function MePage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail>
-      <Page>
+      <Page fill>
         {error && <Notice kind="error">{error}</Notice>}
         {msg && <Notice kind="ok">{msg}</Notice>}
         {p && (

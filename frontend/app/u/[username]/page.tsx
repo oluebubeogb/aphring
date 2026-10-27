@@ -30,7 +30,7 @@ export default function UserPage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail>
-      <Page>
+      <Page fill>
         {error && <Notice>{error}</Notice>}
         {p && (
           <div className="space-y-8">

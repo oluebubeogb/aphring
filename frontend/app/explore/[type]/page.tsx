@@ -30,7 +30,7 @@ export default function ExploreTypePage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail context={{ entityType: String(type || "").toUpperCase() }}>
-      <Page wide>
+      <Page fill>
         <Link href="/explore" className="text-sm text-secondary hover:text-primary">
           ← Explore
         </Link>

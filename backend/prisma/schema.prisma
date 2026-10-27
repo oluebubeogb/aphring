@@ -465,6 +465,8 @@ model PinnedRecord {
   sortOrder         Int      @default(100) @map("sort_order")
   active            Boolean  @default(true)
   note              String?
+  /// AI-written card teaser (2–4 sentences, grounded in the record). Null → rail uses a longer excerpt.
+  teaser            String?  @db.Text
   pinnedById        String   @map("pinned_by")
   impressionCount   Int      @default(0) @map("impression_count")
   clickCount        Int      @default(0) @map("click_count")

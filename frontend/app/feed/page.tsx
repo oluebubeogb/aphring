@@ -47,7 +47,7 @@ export default function FeedPage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail>
-      <Page>
+      <Page fill>
         <h1 className="text-3xl font-semibold tracking-tight mb-1">Feed</h1>
         <p className="text-secondary text-sm mb-6">Verified records. Vote, save, share or propose a correction.</p>
         <Tabs tabs={tabs} value={tab} onChange={setTab} />

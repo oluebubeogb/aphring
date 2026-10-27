@@ -7,6 +7,7 @@ import { Compass, LayoutDashboard, LogIn, LogOut, Menu, MessageSquare, Moon, Rss
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
 import { api, clearSession, getStoredUser, isLoggedIn, isStaff, storeUser, type SessionUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
+import { appShell } from "@/components/ui";
 
 export function useSession() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -62,7 +63,7 @@ export default function Header() {
   return (
     <header className="border-b border-border bg-background/70 backdrop-blur sticky top-0 z-20">
       <div className="h-px w-full bg-slate-300/40 dark:bg-white/5" aria-hidden="true" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+      <div className={`${appShell} h-14 flex items-center justify-between gap-4`}>
         <Link href="/" className="group inline-flex items-center gap-2 font-semibold text-lg tracking-tight">
           <span className="brand-mark" aria-hidden="true" />
           <span className="text-primary">
@@ -104,7 +105,7 @@ export default function Header() {
         </button>
       </div>
       {open && (
-        <div className="md:hidden border-t border-border px-3 py-3 flex flex-col gap-1 text-sm animate-slide-down">
+        <div className={`md:hidden border-t border-border ${appShell} py-3 flex flex-col gap-1 text-sm animate-slide-down`}>
           {links.map((l) => (
             <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className={`mobile-link ${linkCls(l.href, l.tone)}`}>
               <IconBubble icon={l.icon} tone={l.tone} size="sm" active={isActive(l.href)} className="nav-bubble" />
@@ -136,7 +137,7 @@ export default function Header() {
       )}
       {user && user.emailVerified === false && (
         <div className="border-t border-border bg-surface text-xs text-secondary">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-1.5">
+          <div className={`${appShell} py-1.5`}>
             Please confirm your email —{" "}
             <Link href="/verify-email" className="underline text-primary">
               enter your word

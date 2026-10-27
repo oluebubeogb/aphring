@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 
 export const metadata: Metadata = {
   title: "aphring — Nigeria's Community Knowledge Network",
@@ -16,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ChunkLoadRecovery />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

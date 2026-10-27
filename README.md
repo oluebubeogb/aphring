@@ -132,8 +132,16 @@ public profiles show no role badges or review counts.
 ## Pinned records (promoted rail)
 
 Admins can pin **verified** records into a right-hand rail (Workstation → **Pins**). The rail appears on
-Feed, Explore, Explore shelves, entity pages (under *Related*), record pages, Leaderboard, profile pages and
-/me. It hides itself completely when nothing is pinned for the current screen.
+Feed, Explore, Explore shelves, entity pages (under *Related*), record pages, Leaderboard, profile pages,
+/me, Contribute (/submit) and Oral history. It hides itself completely when nothing is pinned for the current screen.
+
+- **Width**: on `lg+` the rail is **30%** of the app shell and the page column **70%** (`lg:w-[30%]` /
+  `lg:w-[70%]`, `gap-8`). On entity pages the content/aside grid is `7fr / 3fr`. Below `lg` it stacks under the page.
+- **Teaser**: each card shows an **AI-written teaser** (2–4 sentences, ~280–450 chars, grounded only in the
+  record) stored on `pinned_records.teaser`. It is written when the pin is created (a longer sentence-bounded
+  excerpt is stored first, replaced by the AI text moments later), older pins are filled in on first rail view,
+  and admins can **Regenerate teaser** in Workstation → Pins (`POST /api/workstation/pins/:id/teaser`). Without
+  a chat model configured the teaser is a ~400-char sentence-bounded excerpt.
 
 - **Forced**: shown to everyone, on every page with a rail.
 - **Relational**: shown only when it fits the viewer or the screen. Score = +3 per entity shared with the
@@ -146,9 +154,18 @@ Feed, Explore, Explore shelves, entity pages (under *Related*), record pages, Le
   a 30-day chart. Only admins (Workstation) and the record's owner (strip on the record page) can see them.
   Pausing keeps analytics; removing a pin deletes them.
 
-Database: migration `0004_pins` adds `pinned_records` and `pin_events`. The backend runs
+Database: migration `0004_pins` adds `pinned_records` and `pin_events`; `0005_pin_teaser` adds `pinned_records.teaser`. The backend runs
 `prisma migrate deploy` on start, so redeploy **both backend and frontend** in Coolify (or run
 `docker compose run --rm backend npm run db:migrate`).
+
+## Layout shell
+
+Header and page bodies share one shell, `appShell` in `frontend/components/ui.tsx`
+(`w-full max-w-[88rem] mx-auto px-4 sm:px-6`), so the logo/nav and the content line up on the same left and
+right edges. `<WithPinRail>` always applies the shell (with or without pins), and pages inside it use
+`<Page fill>` (no extra horizontal padding or max width) so every main page is as wide as Explore.
+`<Page wide>` is the same shell for pages without the rail. Auth pages (login, register, forgot/reset password,
+verify email) center the form with generous vertical padding (`py-16 sm:py-24 md:py-32`).
 
 ## Look and feel knobs
 
@@ -180,3 +197,12 @@ Next.js 15 · Express · Prisma (migrations) · PostgreSQL + pgvector · local f
 - Without a chat model configured, Ask quotes the verified excerpts directly.
 - Chat is rate-limited to 60 messages per user per hour, and 15 per IP per hour for guests.
 - Entity suggestions in the Workstation are rule-based (honorifics, "… School", "… Party", known catalogue names), not AI.
+
+## Chunk load / QUIC errors
+
+Browsers sometimes show `Application error: a client-side exception` with `ChunkLoadError` and `ERR_QUIC_PROTOCOL_ERROR` when loading `/_next/static/chunks/...`. That is almost never an Aphring React bug: the reverse proxy advertises HTTP/3 (`alt-svc: h3`), and QUIC can fail intermittently (Coolify / Traefik / Caddy, CDN, or flaky mobile networks). A hard refresh usually clears it.
+
+Mitigations in this repo:
+- Client auto-reloads once on chunk load failure (`ChunkLoadRecovery`, `error.tsx`, `global-error.tsx`).
+- On Coolify / the proxy for `aphring.beuden.com.ng`, disable HTTP/3 (QUIC) for that service if the error keeps recurring — force HTTP/1.1 or HTTP/2 only.
+

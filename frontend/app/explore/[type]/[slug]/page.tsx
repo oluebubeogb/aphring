@@ -55,8 +55,8 @@ export default function EntityPageView() {
           </div>
         )}
         {data && (
-          <div className="grid lg:grid-cols-[1fr_260px] gap-8 mt-3">
-            <div>
+          <div className="grid lg:grid-cols-[7fr_3fr] gap-8 mt-3">
+            <div className="min-w-0">
               <PageTitle icon={entityTypeStyle(data.entity.type || type).icon} tone={entityTypeStyle(data.entity.type || type).tone} title={data.entity.name} />
               {data.entity.description && <p className="text-secondary mt-1">{data.entity.description}</p>}
               {data.entity.aliases.length > 0 && (
@@ -74,7 +74,7 @@ export default function EntityPageView() {
                 )}
               </div>
             </div>
-            <aside className="space-y-8">
+            <aside className="space-y-8 min-w-0">
               {data.related.length > 0 && (
                 <div className="space-y-3">
                   <h2 className="text-sm font-semibold text-secondary uppercase tracking-wide">Related</h2>

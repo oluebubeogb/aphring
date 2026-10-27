@@ -83,7 +83,7 @@ export default function LeaderboardPage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail>
-      <Page>
+      <Page fill>
         <h1 className="text-3xl font-semibold tracking-tight mb-1">Leaderboard</h1>
         <p className="text-secondary text-sm mb-6">Only verified records count. Score = 5 × verified records + upvotes received.</p>
         <Tabs

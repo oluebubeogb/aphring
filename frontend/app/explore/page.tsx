@@ -71,7 +71,7 @@ export default function ExplorePage() {
     <div className="min-h-screen">
       <Header />
       <WithPinRail>
-      <Page wide>
+      <Page fill>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <PageTitle icon={Compass} tone="emerald" title="Explore" subtitle="Built from verified records only." />
           <form onSubmit={search} className="relative w-full sm:w-80">

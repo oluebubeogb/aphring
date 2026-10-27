@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pin } from "lucide-react";
 import { api } from "@/lib/api";
 import { IconBubble, KnowledgeTypeIcon } from "@/components/Colorful";
+import { appShell } from "@/components/ui";
 
 export interface RailPin {
   id: string;
@@ -24,7 +25,10 @@ export interface RailPin {
     title: string;
     type: string;
     placeText: string | null;
-    snippet: string;
+    /** Short raw excerpt (legacy). */
+    snippet?: string;
+    /** AI-written teaser grounded in the record (falls back to a longer excerpt server-side). */
+    teaser?: string;
     entities: { id: string; name: string; slug: string; type: string }[];
   };
 }
@@ -72,6 +76,7 @@ function PinCard({ pin, index }: { pin: RailPin; index: number }) {
   const pathname = usePathname() || "/";
   const ref = useRef<HTMLAnchorElement>(null);
   const seen = useRef(false);
+  const teaser = pin.record.teaser || pin.record.snippet || "";
 
   useEffect(() => {
     const el = ref.current;
@@ -101,16 +106,17 @@ function PinCard({ pin, index }: { pin: RailPin; index: number }) {
       href={`/record/${pin.record.id}`}
       onClick={() => track(pin.id, "click", pathname)}
       style={{ animationDelay: `${index * 70}ms` }}
-      className={`card-lift animate-fade-up block rounded-xl border border-border bg-surface/80 p-3 ${STEP_INDENT[Math.min(index, STEP_INDENT.length - 1)]}`}
+      className={`card-lift animate-fade-up block rounded-xl border border-border bg-surface/80 p-4 ${STEP_INDENT[Math.min(index, STEP_INDENT.length - 1)]}`}
     >
       <div className="flex items-start gap-2">
         <KnowledgeTypeIcon type={pin.record.type} size="xs" />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-primary line-clamp-2">{pin.record.title}</p>
+          <p className="text-[15px] font-semibold leading-snug text-primary line-clamp-2">{pin.record.title}</p>
           {pin.record.placeText && <p className="text-xs text-secondary mt-0.5 truncate">{pin.record.placeText}</p>}
         </div>
       </div>
-      {pin.record.snippet && <p className="text-xs text-secondary mt-2 line-clamp-3">{pin.record.snippet}</p>}
+      {teaser && <p className="text-[13px] leading-relaxed text-secondary mt-2.5 line-clamp-[7]">{teaser}</p>}
+      <span className="mt-2 inline-block text-xs font-medium text-primary/80">Read the record →</span>
     </Link>
   );
 }
@@ -118,11 +124,11 @@ function PinCard({ pin, index }: { pin: RailPin; index: number }) {
 export function PinRail({ pins, className = "" }: { pins: RailPin[]; className?: string }) {
   if (!pins.length) return null;
   return (
-    <section className={`space-y-2 ${className}`} aria-label="Pinned records">
+    <section className={`space-y-3 ${className}`} aria-label="Pinned records">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-secondary uppercase tracking-wide">
         <IconBubble icon={Pin} tone="rose" size="xs" /> Pinned
       </h2>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {pins.map((p, i) => (
           <PinCard key={p.id} pin={p} index={i} />
         ))}
@@ -131,14 +137,24 @@ export function PinRail({ pins, className = "" }: { pins: RailPin[]; className?:
   );
 }
 
-/** Wraps a page body and adds the Pins rail on the right when there is something to show. */
+/**
+ * Wraps a page body in the shared app shell (same max width + padding as the Header).
+ * On lg+ the main column takes 70% and the Pins rail 30%. With no pins the body still
+ * fills the full shell so every page keeps the same width whether or not pins show.
+ */
 export function WithPinRail({ children, context }: { children: React.ReactNode; context?: PinContext }) {
   const pins = usePins(context);
-  if (!pins.length) return <>{children}</>;
+  if (!pins.length) {
+    return (
+      <div className={appShell}>
+        <div className="w-full min-w-0">{children}</div>
+      </div>
+    );
+  }
   return (
-    <div className="lg:flex lg:max-w-[88rem] lg:mx-auto">
-      <div className="flex-1 min-w-0">{children}</div>
-      <aside className="max-w-3xl mx-auto px-4 sm:px-6 pb-10 lg:mx-0 lg:max-w-none lg:w-72 lg:shrink-0 lg:px-0 lg:pr-6 lg:pt-8">
+    <div className={`${appShell} lg:flex lg:items-start lg:gap-8`}>
+      <div className="w-full min-w-0 lg:w-[70%] lg:max-w-[70%] lg:flex-1">{children}</div>
+      <aside className="w-full pb-10 lg:w-[30%] lg:max-w-[30%] lg:shrink-0 lg:pt-8 lg:self-stretch">
         <div className="lg:sticky lg:top-20">
           <PinRail pins={pins} />
         </div>

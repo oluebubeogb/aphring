@@ -496,3 +496,80 @@ function upstreamError(status: number, body: string) {
   if (status === 429) return new AiServiceError("The AI service is busy. Please try again in a minute.");
   return new AiServiceError(`The AI service returned an error (${status}). Please try again shortly.`);
 }
+
+// ---------------------------------------------------------------- pin teasers
+
+const TEASER_MIN = 220;
+const TEASER_TARGET = 420;
+const TEASER_MAX = 520;
+
+/**
+ * Longer, sentence-bounded excerpt of the record (~400 chars). Used when no chat model is
+ * configured or the call fails — never the old 160-char dump.
+ */
+export function pinTeaserFallback(text: string, target = TEASER_TARGET): string {
+  const clean = singleLine(String(text || "").replace(/[#*_`>]+/g, " ")).replace(/\s+/g, " ").trim();
+  if (clean.length <= target + 60) return clean;
+  const window = clean.slice(0, target + 80);
+  // Last sentence end at or after ~60% of the target, so we don't cut to one short sentence.
+  let cut = -1;
+  const re = /[.!?][)"'”’]?(?=\s)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(window))) {
+    const end = m.index + m[0].length;
+    if (end > target + 80) break;
+    if (end >= target * 0.6) cut = end;
+  }
+  if (cut > 0) return window.slice(0, cut).trim();
+  const space = clean.lastIndexOf(" ", target);
+  return clean.slice(0, space > target * 0.6 ? space : target).trimEnd() + "…";
+}
+
+/**
+ * AI-written pin teaser: 2–4 inviting sentences (~280–450 chars) grounded only in the record.
+ * Falls back to pinTeaserFallback() when the chat model isn't configured or the call fails/looks bad.
+ */
+export async function generatePinTeaser(input: {
+  title: string;
+  type?: string | null;
+  placeText?: string | null;
+  body: string;
+}): Promise<{ teaser: string; ai: boolean }> {
+  const fallback = pinTeaserFallback(input.body);
+  if (!chatConfig().configured) return { teaser: fallback, ai: false };
+  const source = singleLine(input.body).slice(0, 4000);
+  try {
+    const raw = await callChatModel(
+      [
+        {
+          role: "system",
+          content: [
+            "You write the short teaser shown on a pinned record card in Aphring, a verified local-knowledge archive for Nigeria.",
+            "Write 2 to 4 sentences, about 280 to 450 characters in total, in plain text.",
+            "Use ONLY facts stated in the record. Never invent names, dates, numbers or claims.",
+            "Make it rich and inviting: lead with the most striking detail, give a sense of place and why it matters locally, and leave the reader curious to open the full record without retelling everything.",
+            "A warm, knowledgeable Nigerian/local tone is welcome where it fits; keep it respectful and factual.",
+            "No markdown, no lists, no emojis, no hashtags, no quotes around the whole text, no title, and no calls to action like 'Click to read' or 'Read more'.",
+          ].join(" "),
+        },
+        {
+          role: "user",
+          content: `Record title: ${singleLine(input.title).slice(0, 200)}\nKnowledge type: ${input.type || "unknown"}\nPlace: ${input.placeText || "not stated"}\n\nRecord text:\n${source}\n\nTeaser:`,
+        },
+      ],
+      220,
+      "pin-teaser"
+    );
+    let teaser = singleLine(raw)
+      .replace(/^(?:teaser\s*:\s*)/i, "")
+      .replace(/^["“'‘]+|["”'’]+$/g, "")
+      .replace(/\s*(?:click|tap)\s+(?:here\s+)?to\s+read[^.]*\.?\s*$/i, "")
+      .replace(/\s*read\s+more[.!…]*\s*$/i, "")
+      .trim();
+    if (teaser.length > TEASER_MAX) teaser = pinTeaserFallback(teaser, TEASER_MAX - 60);
+    if (teaser.length < Math.min(TEASER_MIN, fallback.length * 0.6) || teaser.length < 80) return { teaser: fallback, ai: false };
+    return { teaser, ai: true };
+  } catch {
+    return { teaser: fallback, ai: false };
+  }
+}

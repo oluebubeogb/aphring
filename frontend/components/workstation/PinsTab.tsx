@@ -8,7 +8,7 @@
  */
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, BarChart3, Pause, Pin, Play, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, Pause, Pin, Play, Plus, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
 import { api, timeAgo } from "@/lib/api";
 import { IconBubble, KnowledgeTypeIcon } from "@/components/Colorful";
 import { btnGhost, btnPrimary, inputCls, Notice } from "@/components/ui";
@@ -20,6 +20,7 @@ interface AdminPin {
   sortOrder: number;
   active: boolean;
   note: string | null;
+  teaser?: string | null;
   impressionCount: number;
   clickCount: number;
   createdAt: string;
@@ -84,6 +85,12 @@ export default function PinsTab({ flash }: { flash: (m: string) => void }) {
     call(() => api("/api/workstation/pins", { method: "POST", body: JSON.stringify({ knowledgeRecordId: id, mode }) }), "Pinned.");
   const patch = (id: string, body: Partial<Pick<AdminPin, "mode" | "sortOrder" | "active" | "note">>) =>
     call(() => api(`/api/workstation/pins/${id}`, { method: "PATCH", body: JSON.stringify(body) }));
+  const [regenerating, setRegenerating] = useState<string | null>(null);
+  async function regenerate(id: string) {
+    setRegenerating(id);
+    await call(() => api(`/api/workstation/pins/${id}/teaser`, { method: "POST" }), "Teaser regenerated.");
+    setRegenerating(null);
+  }
   const remove = (p: AdminPin) => {
     if (!confirm(`Remove the pin for “${p.knowledgeRecord.title}”? Its analytics are deleted too. Pause instead to keep them.`)) return;
     call(() => api(`/api/workstation/pins/${p.id}`, { method: "DELETE" }), "Pin removed.");
@@ -163,6 +170,9 @@ export default function PinsTab({ flash }: { flash: (m: string) => void }) {
         <button className={btnGhost} onClick={() => toggleStats(p.id)}>
           <BarChart3 className="w-4 h-4" /> Analytics
         </button>
+        <button className={btnGhost} onClick={() => regenerate(p.id)} disabled={regenerating === p.id} title="Ask the AI to rewrite this pin's card teaser">
+          <RefreshCw className={`w-4 h-4 ${regenerating === p.id ? "animate-spin" : ""}`} /> {regenerating === p.id ? "Writing…" : "Regenerate teaser"}
+        </button>
         <button className={`${btnGhost} hover:text-red-600`} onClick={() => remove(p)}>
           <Trash2 className="w-4 h-4" /> Remove
         </button>
@@ -170,6 +180,10 @@ export default function PinsTab({ flash }: { flash: (m: string) => void }) {
           by @{p.pinnedBy?.username || "?"} · owner @{p.knowledgeRecord.createdBy?.username || "?"} · {timeAgo(p.createdAt)}
         </span>
       </div>
+      <p className="flex items-start gap-2 text-xs text-secondary leading-relaxed">
+        <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span>{p.teaser || "Teaser is being written…"}</span>
+      </p>
       {openStats === p.id && (
         <div className="rounded-lg border border-border bg-background/60 p-3 text-xs space-y-2">
           {!stats ? (

@@ -15,8 +15,19 @@ export const btnPrimary =
 export const btnGhost =
   "inline-flex items-center justify-center gap-1.5 px-3 h-9 rounded-lg border border-border text-sm text-secondary hover:text-primary hover:bg-surface disabled:opacity-50 transition";
 
-export function Page({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
-  return <main className={`${wide ? "max-w-6xl" : "max-w-3xl"} mx-auto px-4 sm:px-6 py-8`}>{children}</main>;
+/** One shared horizontal shell: the Header and every page body use it so their left/right edges line up. */
+export const appShell = "w-full max-w-[88rem] mx-auto px-4 sm:px-6";
+
+/**
+ * Page body.
+ * - `fill`: fills its parent column with no horizontal padding (use inside <WithPinRail>, which already applies `appShell`).
+ * - `wide`: full app shell width on its own (pages without the rail).
+ * - default: narrow reading column.
+ */
+export function Page({ children, wide, fill }: { children: React.ReactNode; wide?: boolean; fill?: boolean }) {
+  if (fill) return <main className="w-full max-w-none py-8">{children}</main>;
+  if (wide) return <main className={`${appShell} py-8`}>{children}</main>;
+  return <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">{children}</main>;
 }
 
 export function Notice({ kind = "info", children }: { kind?: "info" | "error" | "ok"; children: React.ReactNode }) {

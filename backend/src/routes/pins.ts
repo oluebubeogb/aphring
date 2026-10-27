@@ -20,6 +20,7 @@ import { optionalAuth, requireAuth, requireRole, AuthRequest } from "../middlewa
 import { getAffinityMap } from "../services/affinity.js";
 import { audit } from "../services/roles.js";
 import { HttpError } from "../middleware/error.js";
+import { generatePinTeaser, pinTeaserFallback } from "../services/ai.js";
 
 const RAIL_CAP = 6;
 /** Minimum relevance a RELATIONAL pin needs before it is shown. */
@@ -43,13 +44,43 @@ function snippet(text: string, max = 160) {
   return clean.length > max ? clean.slice(0, max - 1).trimEnd() + "…" : clean;
 }
 
-function cardLite(r: RailRecord) {
+/** Pins whose AI teaser is being generated right now (avoid duplicate model calls). */
+const teaserInFlight = new Set<string>();
+
+/**
+ * Generates the AI teaser for a pin and stores it. Always stores something: the AI text,
+ * or a longer sentence-bounded excerpt when the model is unavailable.
+ */
+export async function refreshPinTeaser(pinId: string): Promise<string | null> {
+  if (teaserInFlight.has(pinId)) return null;
+  teaserInFlight.add(pinId);
+  try {
+    const pin = await prisma.pinnedRecord.findUnique({
+      where: { id: pinId },
+      select: { id: true, knowledgeRecord: { select: { title: true, type: true, placeText: true, content: true } } },
+    });
+    if (!pin) return null;
+    const r = pin.knowledgeRecord;
+    const { teaser, ai } = await generatePinTeaser({ title: r.title, type: String(r.type), placeText: r.placeText, body: r.content });
+    await prisma.pinnedRecord.update({ where: { id: pinId }, data: { teaser } });
+    console.info(`[pins] teaser ${ai ? "generated" : "fallback excerpt"} for pin ${pinId} (${teaser.length} chars)`);
+    return teaser;
+  } catch (err: any) {
+    console.error(`[pins] teaser generation failed for pin ${pinId}:`, err?.message || err);
+    return null;
+  } finally {
+    teaserInFlight.delete(pinId);
+  }
+}
+
+function cardLite(r: RailRecord, teaser?: string | null) {
   return {
     id: r.id,
     title: r.title,
     type: r.type,
     placeText: r.placeText,
     snippet: snippet(r.content),
+    teaser: teaser || pinTeaserFallback(r.content),
     entities: r.entities.slice(0, 4).map((e) => ({ id: e.entity.id, name: e.entity.name, slug: e.entity.slug, type: e.entity.entityType })),
   };
 }
@@ -119,9 +150,11 @@ pinsPublicRouter.get("/rail", optionalAuth, async (req: AuthRequest, res, next) 
         mode: p.mode,
         sortOrder: p.sortOrder,
         step: i,
-        record: cardLite(p.knowledgeRecord),
+        record: cardLite(p.knowledgeRecord, p.teaser),
       })),
     });
+    // Older pins (before 0005_pin_teaser) have no teaser yet: fill them in the background.
+    for (const { p } of shown) if (!p.teaser) void refreshPinTeaser(p.id);
   } catch (err) {
     next(err);
   }
@@ -255,7 +288,7 @@ pinsAdminRouter.post("/", async (req: AuthRequest, res, next) => {
         note: z.string().trim().max(500).optional(),
       })
       .parse(req.body);
-    const record = await prisma.knowledgeRecord.findUnique({ where: { id: body.knowledgeRecordId }, select: { status: true, pin: true } });
+    const record = await prisma.knowledgeRecord.findUnique({ where: { id: body.knowledgeRecordId }, select: { status: true, pin: true, content: true } });
     if (!record) throw new HttpError(404, "Record not found");
     if (record.status !== "VERIFIED") throw new HttpError(400, "Only verified records can be pinned");
     if (record.pin) throw new HttpError(409, "This record is already pinned — edit the existing pin");
@@ -265,9 +298,18 @@ pinsAdminRouter.post("/", async (req: AuthRequest, res, next) => {
       sortOrder = (last._max.sortOrder ?? 0) + 10;
     }
     const pin = await prisma.pinnedRecord.create({
-      data: { knowledgeRecordId: body.knowledgeRecordId, mode: body.mode, sortOrder, note: body.note || null, pinnedById: req.user!.id },
+      // Longer excerpt right away so the rail never shows a bare dump; the AI teaser replaces it moments later.
+      data: {
+        knowledgeRecordId: body.knowledgeRecordId,
+        mode: body.mode,
+        sortOrder,
+        note: body.note || null,
+        teaser: pinTeaserFallback(record.content),
+        pinnedById: req.user!.id,
+      },
       include: adminPinInclude,
     });
+    void refreshPinTeaser(pin.id);
     await audit(req.user!.id, "pin.create", pin.id, { recordId: body.knowledgeRecordId, mode: body.mode, sortOrder });
     res.status(201).json({ pin });
   } catch (err) {
@@ -299,6 +341,22 @@ pinsAdminRouter.patch("/:id", async (req: AuthRequest, res, next) => {
       .parse(req.body);
     const pin = await prisma.pinnedRecord.update({ where: { id: String(req.params.id) }, data: body, include: adminPinInclude });
     await audit(req.user!.id, "pin.update", pin.id, body);
+    res.json({ pin });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Re-runs the AI teaser for one pin and waits for it (admin "Regenerate teaser"). */
+pinsAdminRouter.post("/:id/teaser", async (req: AuthRequest, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const exists = await prisma.pinnedRecord.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) throw new HttpError(404, "Pin not found");
+    if (teaserInFlight.has(id)) throw new HttpError(409, "A teaser is already being generated for this pin");
+    await refreshPinTeaser(id);
+    const pin = await prisma.pinnedRecord.findUnique({ where: { id }, include: adminPinInclude });
+    await audit(req.user!.id, "pin.teaser", id);
     res.json({ pin });
   } catch (err) {
     next(err);

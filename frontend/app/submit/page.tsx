@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, FileText, Upload } from "lucide-react";
+import { WithPinRail } from "@/components/PinRail";
 import Header from "@/components/Header";
 import { api, isLoggedIn, KNOWLEDGE_TYPES } from "@/lib/api";
 import { btnPrimary, inputCls, Notice, Page, Tabs, textareaCls } from "@/components/ui";
@@ -116,7 +117,8 @@ export default function SubmitPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      <Page>
+      <WithPinRail>
+      <Page fill>
         <div className="mb-3">
           <PageTitle icon={Sparkles} tone="orange" title="Contribute knowledge" />
         </div>
@@ -209,6 +211,7 @@ export default function SubmitPage() {
           )}
         </div>
       </Page>
+      </WithPinRail>
     </div>
   );
 }
