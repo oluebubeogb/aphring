@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Compass, Search, Upload, Mic, Trophy, Rss, Sparkles, ArrowRight } from "lucide-react";
+import { Compass, Search, Upload, Mic, Trophy, Rss, ArrowRight } from "lucide-react";
 import Header from "@/components/Header";
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
 
@@ -64,21 +64,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="relative isolate flex-1 flex flex-col items-center justify-center px-6 py-20 overflow-hidden">
-        {/* Soft colour wash behind the hero */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-          <div className="hero-blob left-[8%] top-[10%] w-72 h-72 bg-emerald-300/30 dark:bg-emerald-500/10" />
-          <div className="hero-blob right-[6%] top-[18%] w-80 h-80 bg-sky-300/30 dark:bg-sky-500/10 [animation-delay:-4s]" />
-          <div className="hero-blob left-[35%] bottom-[4%] w-72 h-72 bg-amber-200/40 dark:bg-amber-500/10 [animation-delay:-8s]" />
-        </div>
+      <main className="relative flex-1 flex flex-col items-center justify-center px-6 py-20 overflow-hidden">
         <div className="max-w-3xl w-full text-center space-y-8">
           <div className="space-y-3 animate-fade-up">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/25">
-              <Sparkles className="w-3.5 h-3.5 animate-twinkle" /> Verified community knowledge
-            </span>
             <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-primary">
               Ask{" "}
-              <span className="bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent animate-gradient-x">
+              <span className="text-primary">
                 Aphring
               </span>
             </h1>
@@ -87,7 +78,7 @@ export default function LandingPage() {
           <form onSubmit={handleSearch} className="relative group animate-fade-up [animation-delay:120ms]">
             <div
               aria-hidden="true"
-              className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-sky-400 to-violet-400 opacity-20 blur-md transition-opacity duration-500 group-hover:opacity-40 group-focus-within:opacity-50"
+              className="absolute -inset-0.5 rounded-2xl bg-slate-400 opacity-10 blur-md transition-opacity duration-500 group-hover:opacity-20 group-focus-within:opacity-25"
             />
             <span className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
               <IconBubble icon={Search} tone="violet" size="md" />
@@ -128,7 +119,7 @@ export default function LandingPage() {
                 href={href}
                 title={note}
                 style={{ animationDelay: `${200 + i * 80}ms` }}
-                className={`home-tile group animate-fade-up flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-surface ${TONES[tone].hoverBorder}`}
+                className={`home-tile group animate-fade-up flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-surface/70 ${TONES[tone].hoverBorder}`}
               >
                 <IconBubble icon={icon} tone={tone} size="lg" className="transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6" />
                 <span className="text-sm text-secondary group-hover:text-primary transition-colors">{label}</span>

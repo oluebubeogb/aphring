@@ -8,6 +8,11 @@ import EntityTile, { type ExploreEntity } from "@/components/EntityTile";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api, downloadFile, exploreSeed, timeAgo } from "@/lib/api";
 import { Chip, entityHref, inputCls, Notice, Page } from "@/components/ui";
+import EmptyContribute from "@/components/EmptyContribute";
+import { WithPinRail } from "@/components/PinRail";
+import { BadgeCheck, Compass, Heart, type LucideIcon } from "lucide-react";
+import { entityTypeStyle, IconBubble, type Tone } from "@/components/Colorful";
+import { PageTitle, SectionTitle } from "@/components/ui";
 
 interface ExploreData {
   personalized: boolean;
@@ -18,11 +23,11 @@ interface ExploreData {
   recent: { id: string; title: string; type: string; placeText: string | null; verifiedAt: string; upvotes: number }[];
 }
 
-function Shelf({ title, href, total, children }: { title: string; href?: string; total?: number; children: React.ReactNode }) {
+function Shelf({ title, href, total, children, icon, tone }: { title: string; href?: string; total?: number; children: React.ReactNode; icon: LucideIcon; tone: Tone }) {
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <SectionTitle icon={icon} tone={tone}>{title}</SectionTitle>
         {href && (
           <Link href={href} className="text-sm text-secondary hover:text-primary">
             See all{total ? ` (${total})` : ""} →
@@ -63,14 +68,12 @@ export default function ExplorePage() {
   const empty = data && data.shelves.length === 0 && data.recent.length === 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail>
       <Page wide>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Explore</h1>
-            <p className="text-secondary text-sm mt-1">Built from verified records only.</p>
-          </div>
+          <PageTitle icon={Compass} tone="emerald" title="Explore" subtitle="Built from verified records only." />
           <form onSubmit={search} className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people, places, schools…" className={`${inputCls} pl-9`} />
@@ -82,7 +85,7 @@ export default function ExplorePage() {
         {results && (
           <section className="mb-10 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Results for “{q}”</h2>
+              <SectionTitle icon={Search} tone="sky">Results for “{q}”</SectionTitle>
               <button className="text-sm text-secondary hover:text-primary" onClick={() => setResults(null)}>
                 Clear
               </button>
@@ -103,44 +106,44 @@ export default function ExplorePage() {
               ))}
             </div>
             {results.entities.length === 0 && results.records.length === 0 && (
-              <p className="text-sm text-secondary">Nothing verified matches yet.</p>
+              <EmptyContribute title="Nothing verified matches that search" detail="Try different words, or contribute what you know so it can be verified and found next time." />
             )}
           </section>
         )}
 
         {!data && !error && <p className="text-secondary">Loading…</p>}
         {empty && (
-          <Notice>
-            Nothing has been verified yet. Explore fills itself as moderators verify records: people, places, schools and events
-            appear automatically. <Link href="/submit" className="underline">Contribute the first record</Link>.
-          </Notice>
+          <EmptyContribute
+            title="Explore is waiting on the first verified records"
+            detail="People, places, schools and events appear here as records are verified. Add what you know to get the shelves started."
+          />
         )}
 
         {data && (
           <div className="space-y-10">
             {data.forYou.length > 0 && (
-              <Shelf title="For you">
+              <Shelf title="For you" icon={Heart} tone="rose">
                 {data.forYou.map((e) => (
                   <EntityTile key={e.id} e={e} />
                 ))}
               </Shelf>
             )}
             {data.shelves.map((s) => (
-              <Shelf key={s.type} title={s.label} href={`/explore/${s.type.toLowerCase()}`} total={s.total}>
+              <Shelf key={s.type} icon={entityTypeStyle(s.type).icon} tone={entityTypeStyle(s.type).tone} title={s.label} href={`/explore/${s.type.toLowerCase()}`} total={s.total}>
                 {s.entities.map((e) => (
                   <EntityTile key={e.id} e={e} />
                 ))}
               </Shelf>
             ))}
             {data.documents.length > 0 && (
-              <Shelf title="Source documents">
+              <Shelf title="Source documents" icon={FileText} tone="sky">
                 {data.documents.map((d) => (
                   <button
                     key={d.id}
                     onClick={() => downloadFile(`/api/documents/${d.id}/download`, d.filename).catch((e) => setError(e.message))}
                     className="text-left min-w-[200px] shrink-0 p-4 rounded-xl border border-border bg-surface hover:border-accent/40"
                   >
-                    <FileText className="w-4 h-4 text-secondary mb-2" />
+                    <IconBubble icon={FileText} tone="sky" size="xs" className="mb-2" />
                     <p className="text-sm font-medium truncate">{d.filename}</p>
                   </button>
                 ))}
@@ -149,7 +152,7 @@ export default function ExplorePage() {
             {data.recent.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-baseline justify-between">
-                  <h2 className="text-lg font-semibold">Recently verified</h2>
+                  <SectionTitle icon={BadgeCheck} tone="emerald">Recently verified</SectionTitle>
                   <Link href="/feed" className="text-sm text-secondary hover:text-primary">
                     Open feed →
                   </Link>
@@ -172,6 +175,7 @@ export default function ExplorePage() {
           </div>
         )}
       </Page>
+      </WithPinRail>
     </div>
   );
 }

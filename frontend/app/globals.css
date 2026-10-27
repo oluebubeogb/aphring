@@ -9,6 +9,11 @@
   --primary-text: #111827;
   --secondary-text: #6B7280;
   --accent: #0F172A;
+  /* ONE sitewide knob for colour intensity behind icons, chips and bars.
+     0 = invisible, 1 = full tone. Calm default: barely visible. */
+  --icon-bubble-opacity: 0.32;
+  /* Strength of the soft rotating page wash (0–1). */
+  --page-wash-opacity: 0.55;
 }
 
 .dark {
@@ -18,6 +23,8 @@
   --primary-text: #FFFFFF;
   --secondary-text: #A3A3A3;
   --accent: #F5F5F5;
+  --icon-bubble-opacity: 0.22;
+  --page-wash-opacity: 0.18;
 }
 
 * {
@@ -30,11 +37,72 @@ body {
 }
 
 body {
+  position: relative;
+  isolation: isolate;
   background: var(--background);
   color: var(--primary-text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Sitewide soft page wash: one pastel hue at a time, slowly cycling
+   (sky → mint → lilac → peach). Sits behind every page. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--page-wash-opacity);
+  background-color: rgb(224 242 254);
+  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 0%, rgba(0, 0, 0, 0.55) 55%, transparent 100%);
+  mask-image: radial-gradient(120% 80% at 50% 0%, #000 0%, rgba(0, 0, 0, 0.55) 55%, transparent 100%);
+  animation: pageWash 64s ease-in-out infinite;
+}
+.dark body::before {
+  animation-name: pageWashDark;
+  background-color: rgb(30 58 82);
+}
+@keyframes pageWash {
+  0%, 100% { background-color: rgb(224 242 254); } /* soft sky */
+  25% { background-color: rgb(220 252 231); }      /* soft mint */
+  50% { background-color: rgb(237 233 254); }      /* soft lilac */
+  75% { background-color: rgb(255 237 213); }      /* soft peach */
+}
+@keyframes pageWashDark {
+  0%, 100% { background-color: rgb(30 58 82); }
+  25% { background-color: rgb(22 70 52); }
+  50% { background-color: rgb(52 42 88); }
+  75% { background-color: rgb(80 50 30); }
+}
+
+/* Tone colour channels (see Colorful.tsx). Outside @layer so they are never purged. */
+.tone-emerald { --tone-rgb: 52 211 153; }
+.tone-sky { --tone-rgb: 56 189 248; }
+.tone-violet { --tone-rgb: 167 139 250; }
+.tone-amber { --tone-rgb: 251 191 36; }
+.tone-yellow { --tone-rgb: 250 204 21; }
+.tone-slate { --tone-rgb: 148 163 184; }
+.tone-rose { --tone-rgb: 251 113 133; }
+.tone-teal { --tone-rgb: 45 212 191; }
+.tone-orange { --tone-rgb: 251 146 60; }
+.tone-indigo { --tone-rgb: 129 140 248; }
+.tone-fuchsia { --tone-rgb: 232 121 249; }
+.tone-blue { --tone-rgb: 96 165 250; }
+.tone-green { --tone-rgb: 74 222 128; }
+.tone-gray { --tone-rgb: 156 163 175; }
+
+/* Calm tone fills, all scaled by --icon-bubble-opacity. */
+.icon-bubble {
+  background-color: rgb(var(--tone-rgb, 148 163 184) / calc(var(--icon-bubble-opacity) * 0.55));
+}
+.tone-soft {
+  background-color: rgb(var(--tone-rgb) / calc(var(--icon-bubble-opacity) * 0.35));
+  border-color: rgb(var(--tone-rgb) / calc(var(--icon-bubble-opacity) * 1.1));
+}
+.tone-bar {
+  background-color: rgb(var(--tone-rgb) / calc(var(--icon-bubble-opacity) * 2.2));
 }
 
 /* Minimal scrollbar */
@@ -219,6 +287,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body::before,
+  .dark body::before {
+    animation: none !important;
+  }
   *,
   *::before,
   *::after {

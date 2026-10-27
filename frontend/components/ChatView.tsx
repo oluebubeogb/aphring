@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Plus, MessageSquare, Send, Menu, X, Compass, Copy, Check, ThumbsUp, ThumbsDown, Rss, User, LayoutDashboard, Moon, Sun, LogOut, Sparkles, LogIn } from "lucide-react";
 import { IconBubble, TONES } from "@/components/Colorful";
+import EmptyContribute from "@/components/EmptyContribute";
 import { api, isLoggedIn, clearToken, isStaff, getStoredUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 import SourceOverlay, { type SourceRef } from "@/components/SourceOverlay";
@@ -317,7 +318,7 @@ export default function ChatView({ chatId }: { chatId?: string }) {
   }
 
   return (
-    <div className="h-screen flex bg-background">
+    <div className="h-screen flex">
       {/* Sidebar (signed-in only: guests have no saved history) */}
       {guest === false && (
       <aside
@@ -328,7 +329,7 @@ export default function ChatView({ chatId }: { chatId?: string }) {
         <div className="p-4 flex items-center justify-between border-b border-border">
           <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
             <span className="brand-mark" aria-hidden="true" />
-            <span className="bg-gradient-to-r from-emerald-600 via-sky-600 to-violet-600 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">aphring</span>
+            <span className="text-primary">aphring</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -419,7 +420,7 @@ export default function ChatView({ chatId }: { chatId?: string }) {
           {guest ? (
             <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
               <span className="brand-mark" aria-hidden="true" />
-              <span className="bg-gradient-to-r from-emerald-600 via-sky-600 to-violet-600 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">aphring</span>
+              <span className="text-primary">aphring</span>
             </Link>
           ) : (
             <button
@@ -459,13 +460,13 @@ export default function ChatView({ chatId }: { chatId?: string }) {
               <IconBubble icon={Sparkles} tone="violet" size="lg" className="animate-float-soft" />
               <h2 className="text-2xl font-semibold">
                 Ask{" "}
-                <span className="bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">
+                <span className="text-primary">
                   Aphring
                 </span>
               </h2>
               <p className="text-secondary max-w-md">
-                Answers come only from verified records, with links to each
-                source. If nothing verified matches, Aphring says so.
+                Answers come only from verified records, with links to each source.
+                If something is missing, Aphring will invite you to Contribute what you know.
               </p>
             </div>
           )}
@@ -484,13 +485,21 @@ export default function ChatView({ chatId }: { chatId?: string }) {
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                     m.role === "USER"
-                      ? "bg-gradient-to-br from-slate-900 to-slate-700 text-white dark:from-sky-500/25 dark:to-violet-500/25 dark:text-white dark:border dark:border-sky-400/20 shadow-sm"
+                      ? "bg-slate-800 text-white dark:bg-white/10 dark:text-white dark:border dark:border-white/10 shadow-sm"
                       : m.error
                         ? "bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/25 dark:text-rose-200"
-                        : "bg-gradient-to-br from-surface to-violet-50/60 dark:to-violet-500/5 border border-border text-primary"
+                        : "bg-surface/80 border border-border text-primary"
                   }`}
                 >
                   {m.content}
+                  {m.role === "ASSISTANT" && !m.error && (!m.sources || m.sources.length === 0) && /nothing verified in aphring covers|no verified information about this topic/i.test(m.content) && (
+                    <div className="mt-3 whitespace-normal">
+                      <EmptyContribute
+                        title="Help fill this gap"
+                        detail="Your contribution goes to review. Once verified, Ask and Explore can use it."
+                      />
+                    </div>
+                  )}
                   {m.role === "ASSISTANT" && m.sources && m.sources.length > 0 && (
                     <div className="mt-3 pt-2 border-t border-border flex flex-wrap gap-1.5 whitespace-normal">
                       <span className="text-xs text-secondary">Sources:</span>
@@ -596,7 +605,7 @@ export default function ChatView({ chatId }: { chatId?: string }) {
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="h-12 w-12 flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-sm hover:shadow-md hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 transition"
+              className="h-12 w-12 flex items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm hover:bg-violet-700 hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 transition dark:bg-violet-500 dark:hover:bg-violet-400"
             >
               <Send className="w-4 h-4" />
             </button>

@@ -45,7 +45,7 @@ export default function OralHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
       <Page>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Oral history</h1>

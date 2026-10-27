@@ -7,6 +7,7 @@ import Header, { useSession } from "@/components/Header";
 import { ActionBar, EntityChips, useRecordActions, type PublicRecord } from "@/components/RecordCard";
 import { api, isLoggedIn, KNOWLEDGE_TYPES, timeAgo } from "@/lib/api";
 import { btnGhost, btnPrimary, inputCls, Notice, Page, StatusPill, textareaCls, KnowledgeTypeIcon } from "@/components/ui";
+import { PinAnalyticsStrip, WithPinRail } from "@/components/PinRail";
 
 type Full = PublicRecord & { revisions: number; reviewNote?: string | null };
 interface Correction {
@@ -140,6 +141,7 @@ function RecordView({ initial }: { initial: Full }) {
           </p>
         )}
         <ActionBar a={a} full />
+        {verified && (isOwner || user?.role === "ADMIN") && <PinAnalyticsStrip recordId={rec.id} />}
         {isOwner && !verified && !editing && (
           <div className="flex gap-2">
             <button className={btnGhost} onClick={() => setEditing(true)}>
@@ -201,13 +203,15 @@ export default function RecordPage() {
       .catch((e) => setError(e.status === 404 ? "This record does not exist or is not public." : e.message));
   }, [id]);
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail context={rec ? { entityIds: rec.entities.map((e) => e.id), types: [rec.type], excludeRecordId: rec.id } : undefined}>
       <Page>
         {error && <Notice>{error}</Notice>}
         {!rec && !error && <p className="text-secondary">Loading…</p>}
         {rec && <RecordView key={rec.id} initial={rec} />}
       </Page>
+      </WithPinRail>
     </div>
   );
 }

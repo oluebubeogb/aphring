@@ -7,6 +7,9 @@ import { CheckCircle, FileText, Upload } from "lucide-react";
 import Header from "@/components/Header";
 import { api, isLoggedIn, KNOWLEDGE_TYPES } from "@/lib/api";
 import { btnPrimary, inputCls, Notice, Page, Tabs, textareaCls } from "@/components/ui";
+import { AlignLeft, MapPin, PenLine, Sparkles, Tags, Type } from "lucide-react";
+import { IconBubble } from "@/components/Colorful";
+import { FieldLabel, PageTitle } from "@/components/ui";
 
 function PlaceAndType({
   place,
@@ -22,7 +25,7 @@ function PlaceAndType({
   return (
     <div className="grid sm:grid-cols-2 gap-4">
       <div>
-        <label className="block text-sm text-secondary mb-1.5">Place (optional)</label>
+        <FieldLabel icon={MapPin} tone="teal" className="mb-1.5">Place (optional)</FieldLabel>
         <input
           value={place}
           onChange={(e) => setPlace(e.target.value)}
@@ -33,7 +36,7 @@ function PlaceAndType({
         <p className="text-xs text-secondary mt-1">Type it as you know it. A moderator matches it to the right place.</p>
       </div>
       <div>
-        <label className="block text-sm text-secondary mb-1.5">Category</label>
+        <FieldLabel icon={Tags} tone="violet" className="mb-1.5">Category</FieldLabel>
         <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
           {KNOWLEDGE_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -111,10 +114,12 @@ export default function SubmitPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
       <Page>
-        <h1 className="text-3xl font-semibold tracking-tight mb-2">Contribute knowledge</h1>
+        <div className="mb-3">
+          <PageTitle icon={Sparkles} tone="orange" title="Contribute knowledge" />
+        </div>
         <p className="text-secondary mb-6">
           Everything you send is reviewed by a moderator before it becomes public, searchable and counted toward your badges.
           For recordings use <Link href="/oral" className="underline">Oral history</Link>.
@@ -123,8 +128,8 @@ export default function SubmitPage() {
           value={tab}
           onChange={setTab}
           tabs={[
-            { value: "file", label: "Upload a file" },
-            { value: "write", label: "Write a record" },
+            { value: "file", label: "Upload a file", icon: Upload, tone: "sky" },
+            { value: "write", label: "Write a record", icon: PenLine, tone: "amber" },
           ]}
         />
         <div className="mt-6 space-y-6">
@@ -143,7 +148,7 @@ export default function SubmitPage() {
                   dragging ? "border-accent bg-surface" : "border-border hover:border-accent/40"
                 }`}
               >
-                <Upload className="w-8 h-8 text-secondary mx-auto mb-4" />
+                <IconBubble icon={Upload} tone="sky" size="lg" className="mx-auto mb-4" />
                 <p className="text-primary mb-1">Drag & drop a file here</p>
                 <p className="text-sm text-secondary mb-4">PDF, DOCX or TXT · max 20 MB · scanned PDFs need OCR first</p>
                 <label className="inline-block px-4 py-2 rounded-lg border border-border text-sm cursor-pointer hover:bg-surface transition">
@@ -154,7 +159,7 @@ export default function SubmitPage() {
               {file && (
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-surface">
                   <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-secondary" />
+                    <IconBubble icon={FileText} tone="sky" size="sm" />
                     <div>
                       <p className="text-sm font-medium">{file.name}</p>
                       <p className="text-xs text-secondary">{(file.size / 1024).toFixed(1)} KB</p>
@@ -169,11 +174,11 @@ export default function SubmitPage() {
           ) : (
             <form onSubmit={write} className="space-y-4">
               <div>
-                <label className="block text-sm text-secondary mb-1.5">Title</label>
+                <FieldLabel icon={Type} tone="sky" className="mb-1.5">Title</FieldLabel>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} required minLength={3} maxLength={300} className={inputCls} />
               </div>
               <div>
-                <label className="block text-sm text-secondary mb-1.5">Record</label>
+                <FieldLabel icon={AlignLeft} tone="emerald" className="mb-1.5">Record</FieldLabel>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
@@ -193,7 +198,7 @@ export default function SubmitPage() {
           {error && <Notice kind="error">{error}</Notice>}
           {result && (
             <div className="p-4 rounded-xl border border-border bg-surface flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+              <IconBubble icon={CheckCircle} tone="emerald" size="sm" />
               <div>
                 <p className="text-sm">{result}</p>
                 <Link href="/me" className="text-sm underline text-secondary">

@@ -6,7 +6,9 @@ import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api } from "@/lib/api";
 import { Clock, Sparkles, TrendingUp, type LucideIcon } from "lucide-react";
 import { btnGhost, Notice, Page, Tabs } from "@/components/ui";
+import EmptyContribute from "@/components/EmptyContribute";
 import type { Tone } from "@/components/Colorful";
+import { WithPinRail } from "@/components/PinRail";
 
 type Tab = "recent" | "top" | "foryou";
 
@@ -42,8 +44,9 @@ export default function FeedPage() {
   if (user) tabs.push({ value: "foryou", label: "For you", icon: Sparkles, tone: "violet" });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail>
       <Page>
         <h1 className="text-3xl font-semibold tracking-tight mb-1">Feed</h1>
         <p className="text-secondary text-sm mb-6">Verified records. Vote, save, share or propose a correction.</p>
@@ -54,7 +57,9 @@ export default function FeedPage() {
           {records.map((r) => (
             <RecordCard key={`${tab}-${r.id}`} record={r} />
           ))}
-          {records.length === 0 && !error && <p className="text-sm text-secondary">No verified records yet.</p>}
+          {records.length === 0 && !error && (
+            <EmptyContribute title="No verified records in this feed yet" detail="Be the first to add knowledge the community can verify — it will show up here once approved." />
+          )}
           {more && records.length > 0 && (
             <button
               className={btnGhost}
@@ -69,6 +74,7 @@ export default function FeedPage() {
           )}
         </div>
       </Page>
+      </WithPinRail>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { BadgeList, MilestoneList, StatsGrid, type Badge, type Milestone, type Stats } from "@/components/Badges";
 import { api, isLoggedIn, storeUser, timeAgo } from "@/lib/api";
 import { btnGhost, btnPrimary, Notice, Page, StatusPill, Tabs } from "@/components/ui";
+import { WithPinRail } from "@/components/PinRail";
 
 interface Profile {
   user: { id: string; username: string; name: string; email: string; role: "USER" | "MODERATOR" | "ADMIN"; reputation: number; createdAt: string };
@@ -79,8 +80,9 @@ export default function MePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail>
       <Page>
         {error && <Notice kind="error">{error}</Notice>}
         {msg && <Notice kind="ok">{msg}</Notice>}
@@ -179,6 +181,7 @@ export default function MePage() {
           </div>
         )}
       </Page>
+      </WithPinRail>
     </div>
   );
 }

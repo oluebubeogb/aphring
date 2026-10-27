@@ -78,6 +78,17 @@ enum EmailPurpose {
   RESET_PASSWORD
 }
 
+/// Right-rail pins (Promoted records). FORCED = shown to everyone; RELATIONAL = only when it fits the viewer's interests / active screen.
+enum PinMode {
+  FORCED
+  RELATIONAL
+}
+
+enum PinEventType {
+  IMPRESSION
+  CLICK
+}
+
 enum CorrectionField {
   TITLE
   CONTENT
@@ -118,6 +129,8 @@ model User {
   auditLogs           AuditLog[]
   emailChallenges     EmailChallenge[]
   messageVotes        MessageVote[]
+  pinsCreated         PinnedRecord[]
+  pinEvents           PinEvent[]
 
   @@map("users")
 }
@@ -168,6 +181,7 @@ model KnowledgeRecord {
   corrections Correction[]
   revisions   RecordRevision[]
   saves       SavedRecord[]
+  pin         PinnedRecord?
 
   @@index([status])
   @@index([type])
@@ -440,4 +454,45 @@ model EmailChallenge {
 
   @@index([userId, purpose, createdAt])
   @@map("email_challenges")
+}
+
+/// Admin-pinned verified record shown in the right rail ("Pins" / Promoted).
+/// One pin row per record. Lower sortOrder = higher step on the stack.
+model PinnedRecord {
+  id                String   @id @default(cuid())
+  knowledgeRecordId String   @unique @map("knowledge_record_id")
+  mode              PinMode  @default(FORCED)
+  sortOrder         Int      @default(100) @map("sort_order")
+  active            Boolean  @default(true)
+  note              String?
+  pinnedById        String   @map("pinned_by")
+  impressionCount   Int      @default(0) @map("impression_count")
+  clickCount        Int      @default(0) @map("click_count")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  knowledgeRecord KnowledgeRecord @relation(fields: [knowledgeRecordId], references: [id], onDelete: Cascade)
+  pinnedBy        User            @relation(fields: [pinnedById], references: [id])
+  events          PinEvent[]
+
+  @@index([active, sortOrder])
+  @@index([mode])
+  @@map("pinned_records")
+}
+
+/// Raw impression/click log for pins (counters on PinnedRecord are the fast path).
+model PinEvent {
+  id        String       @id @default(cuid())
+  pinId     String       @map("pin_id")
+  type      PinEventType
+  userId    String?      @map("user_id")
+  /// Page path / context the pin was seen on (trimmed, no query text).
+  context   String?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  pin  PinnedRecord @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([pinId, type, createdAt])
+  @@map("pin_events")
 }

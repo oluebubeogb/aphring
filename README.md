@@ -129,6 +129,36 @@ One general leaderboard for everybody, staff included, ranked by verified work, 
 (First record → Contributor → Chronicler → Historian → Archivist of the people). It shows no roles, and
 public profiles show no role badges or review counts.
 
+## Pinned records (promoted rail)
+
+Admins can pin **verified** records into a right-hand rail (Workstation → **Pins**). The rail appears on
+Feed, Explore, Explore shelves, entity pages (under *Related*), record pages, Leaderboard, profile pages and
+/me. It hides itself completely when nothing is pinned for the current screen.
+
+- **Forced**: shown to everyone, on every page with a rail.
+- **Relational**: shown only when it fits the viewer or the screen. Score = +3 per entity shared with the
+  current screen, +2 if the record's category matches the screen, +1 if one of its entities is of the
+  shelf's entity type, plus the signed-in viewer's interest (decayed affinity on its entities, capped at 5).
+  It shows when the score is at least 1.
+- **Order**: lowest *Order* number is the top step; pins render as stepped "pyramid" cards, not stacked.
+  Relevance decides only *whether* a relational pin shows, never its position. Max 6 per screen.
+- **Analytics**: impressions (counted once per view when 50% of the card is on screen) and clicks, with
+  a 30-day chart. Only admins (Workstation) and the record's owner (strip on the record page) can see them.
+  Pausing keeps analytics; removing a pin deletes them.
+
+Database: migration `0004_pins` adds `pinned_records` and `pin_events`. The backend runs
+`prisma migrate deploy` on start, so redeploy **both backend and frontend** in Coolify (or run
+`docker compose run --rm backend npm run db:migrate`).
+
+## Look and feel knobs
+
+In `frontend/app/globals.css`:
+
+- `--icon-bubble-opacity` (light `0.32`, dark `0.22`): strength of every coloured icon background, tinted
+  chip and tone bar sitewide. Lower is fainter; `0` removes the tint.
+- `--page-wash-opacity` (light `0.55`, dark `0.18`): strength of the slow single-hue background wash
+  (sky → mint → lilac → peach, ~16 s each) used on every page. It is static under *reduce motion*.
+
 ## Local development
 
 ```bash

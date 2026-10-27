@@ -63,7 +63,7 @@ export default function VerifyEmailPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <Link href="/" className="text-2xl font-semibold tracking-tight">

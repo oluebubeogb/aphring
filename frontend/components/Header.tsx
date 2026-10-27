@@ -60,12 +60,12 @@ export default function Header() {
   };
 
   return (
-    <header className="border-b border-border bg-background/85 backdrop-blur sticky top-0 z-20">
-      <div className="h-0.5 w-full bg-gradient-to-r from-emerald-400 via-sky-400 via-50% to-amber-400 opacity-70" aria-hidden="true" />
+    <header className="border-b border-border bg-background/70 backdrop-blur sticky top-0 z-20">
+      <div className="h-px w-full bg-slate-300/40 dark:bg-white/5" aria-hidden="true" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
         <Link href="/" className="group inline-flex items-center gap-2 font-semibold text-lg tracking-tight">
           <span className="brand-mark" aria-hidden="true" />
-          <span className="bg-gradient-to-r from-emerald-600 via-sky-600 to-violet-600 dark:from-emerald-300 dark:via-sky-300 dark:to-violet-300 bg-clip-text text-transparent">
+          <span className="text-primary">
             aphring
           </span>
         </Link>

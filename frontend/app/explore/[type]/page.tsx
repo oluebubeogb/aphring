@@ -7,6 +7,10 @@ import Header from "@/components/Header";
 import EntityTile, { type ExploreEntity } from "@/components/EntityTile";
 import { api } from "@/lib/api";
 import { Notice, Page } from "@/components/ui";
+import EmptyContribute from "@/components/EmptyContribute";
+import { WithPinRail } from "@/components/PinRail";
+import { entityTypeStyle } from "@/components/Colorful";
+import { PageTitle } from "@/components/ui";
 
 export default function ExploreTypePage() {
   const { type } = useParams<{ type: string }>();
@@ -23,13 +27,16 @@ export default function ExploreTypePage() {
   const list = (shelf?.entities || []).filter((e) => e.name.toLowerCase().includes(filter.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail context={{ entityType: String(type || "").toUpperCase() }}>
       <Page wide>
         <Link href="/explore" className="text-sm text-secondary hover:text-primary">
           ← Explore
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight mt-2 mb-6">{shelf?.label || "Explore"}</h1>
+        <div className="mt-2 mb-6">
+          <PageTitle icon={entityTypeStyle(type).icon} tone={entityTypeStyle(type).tone} title={shelf?.label || "Explore"} />
+        </div>
         {error && <Notice kind="error">{error}</Notice>}
         {shelf && (
           <>
@@ -44,9 +51,18 @@ export default function ExploreTypePage() {
                 <EntityTile key={e.id} e={e} />
               ))}
             </div>
+            {list.length === 0 && (
+              <div className="mt-6">
+                <EmptyContribute
+                  title="Nothing in this shelf matches yet"
+                  detail="Contribute a verified record that belongs here, or clear the filter if you were searching."
+                />
+              </div>
+            )}
           </>
         )}
       </Page>
+      </WithPinRail>
     </div>
   );
 }

@@ -15,13 +15,13 @@ Rules:
    - Put a blank line between paragraphs.
    - For book or work titles, use plain quotation marks (e.g. "Things Fall Apart"), never markdown (*italics*, **bold**, _underscores_, # headings, or bullet lists).
 4. If the context does not contain relevant information for the question, reply with exactly this sentence and nothing else:
-The Aphring knowledge base currently contains no verified information about this topic.
+Nothing verified in Aphring covers this yet. If you know something about it, add it under Contribute so the community can verify it for everyone.
 5. When you do answer from context, do not invent source labels in the body — the system will attach sources separately only when relevant.
 6. Strip any odd characters from source text (control characters, excessive backslashes) and rephrase into readable prose.
 7. Answer the user's actual question first, in one clear opening sentence (yes, no, not in the verified records, or partly).
 8. If the exact thing they asked is not in the context, say that plainly — for example: "The verified records do not mention a seaport named after him." Then, if the context has a closely related fact about the same person or place (an airport, an aircraft, a building, an award), say that next and give a short useful detail from the context (what was named, when, where, who was involved).
 9. Never dump raw source titles or truncated snippets. Always write a natural, spoken answer in short paragraphs.
-10. Do not use the fixed "no verified information" sentence when the context has related information about the same person or topic — follow rule 8 instead. That fixed sentence is only for when nothing in the context is relevant at all.`;
+10. Do not use the fixed "nothing verified… Contribute" empty answer when the context has related information about the same person or topic — follow rule 8 instead. That fixed answer is only for when nothing in the context is relevant at all.`;
 
 export interface RetrievedSource {
   id: string;
@@ -32,7 +32,7 @@ export interface RetrievedSource {
 }
 
 export const NO_INFO =
-  "The Aphring knowledge base currently contains no verified information about this topic.";
+  "Nothing verified in Aphring covers this yet. If you know something about it, add it under Contribute so the community can verify it for everyone.";
 
 type ChatMessage = { role: string; content: string };
 
@@ -311,7 +311,7 @@ function isBareNoInfo(answer: string): boolean {
   if (!s) return true;
   if (s === NO_INFO.toLowerCase()) return true;
   // Exact canned line only — a longer answer that mentions the phrase is fine.
-  return s.length < 120 && s.includes("no verified information") && !/\b(but|however|airport|aircraft|named|instead|related)\b/i.test(s);
+  return s.length < 220 && (s.includes("no verified information") || s.includes("nothing verified in aphring covers")) && !/\b(but|however|airport|aircraft|named|instead|related)\b/i.test(s);
 }
 
 /** Last-resort natural answer when the model still refuses despite having sources. */
@@ -380,7 +380,7 @@ export async function generateAnswer(
           content:
             "Your previous reply claimed there was no information, but context sources were provided. " +
             "Answer again using rules 7–8: say what is missing for this exact question, then summarise the closest related verified facts in clear paragraphs. " +
-            "Do not use the fixed \"no verified information\" sentence.",
+            "Do not use the fixed empty-answer / Contribute sentence.",
         },
       ],
       700,

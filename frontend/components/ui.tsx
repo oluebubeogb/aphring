@@ -139,3 +139,50 @@ export const knowledgeTypeCls = "font-bold uppercase tracking-wide [font-variant
 export function entityHref(e: { type?: string; entityType?: string; slug: string }) {
   return `/explore/${(e.type || e.entityType || "topic").toLowerCase()}/${e.slug}`;
 }
+
+/** Page title with a calm icon bubble (Explore, Contribute, Workstation…). */
+export function PageTitle({ icon, tone, title, subtitle }: { icon: LucideIcon; tone: Tone; title: React.ReactNode; subtitle?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 animate-fade-up">
+      <IconBubble icon={icon} tone={tone} size="lg" className="hover-pop" />
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight text-primary">{title}</h1>
+        {subtitle && <p className="text-secondary text-sm mt-1">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Brand + icon header used on login / register / password pages. */
+export function AuthHeader({ icon, tone, subtitle }: { icon: LucideIcon; tone: Tone; subtitle: React.ReactNode }) {
+  return (
+    <div className="text-center flex flex-col items-center gap-3 animate-fade-up">
+      <IconBubble icon={icon} tone={tone} size="lg" className="animate-float-soft" />
+      <Link href="/" className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight text-primary">
+        <span className="brand-mark" aria-hidden="true" />
+        aphring
+      </Link>
+      <p className="text-secondary text-sm">{subtitle}</p>
+    </div>
+  );
+}
+
+/** Form label with a small tone icon. */
+export function FieldLabel({ icon, tone, children, className = "" }: { icon: LucideIcon; tone: Tone; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`flex items-center gap-1.5 text-sm text-secondary ${className}`}>
+      <IconBubble icon={icon} tone={tone} size="xs" />
+      {children}
+    </label>
+  );
+}
+
+/** Small section heading with an icon bubble. */
+export function SectionTitle({ icon, tone, children }: { icon: LucideIcon; tone: Tone; children: React.ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-2 text-lg font-semibold">
+      <IconBubble icon={icon} tone={tone} size="sm" />
+      {children}
+    </h2>
+  );
+}

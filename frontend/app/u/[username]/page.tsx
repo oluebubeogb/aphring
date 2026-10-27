@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import { BadgeList, MilestoneList, StatsGrid, type Badge, type Milestone, type Stats } from "@/components/Badges";
 import { api, timeAgo } from "@/lib/api";
 import { Notice, Page } from "@/components/ui";
+import { WithPinRail } from "@/components/PinRail";
 
 interface PublicProfile {
   user: { username: string; name: string; reputation: number; createdAt: string };
@@ -26,8 +27,9 @@ export default function UserPage() {
       .catch((e) => setError(e.message));
   }, [username]);
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail>
       <Page>
         {error && <Notice>{error}</Notice>}
         {p && (
@@ -49,7 +51,7 @@ export default function UserPage() {
             </section>
             <section className="space-y-3">
               <h2 className="text-lg font-semibold">Recently verified</h2>
-              {p.recent.length === 0 && <p className="text-sm text-secondary">No verified records yet.</p>}
+              {p.recent.length === 0 && <p className="text-sm text-secondary">No verified records yet. <a href="/submit" className="underline hover:text-primary">Contribute</a> to get started.</p>}
               <ul className="divide-y divide-border border border-border rounded-xl bg-surface">
                 {p.recent.map((r) => (
                   <li key={r.id}>
@@ -66,6 +68,7 @@ export default function UserPage() {
           </div>
         )}
       </Page>
+      </WithPinRail>
     </div>
   );
 }

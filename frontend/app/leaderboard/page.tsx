@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { CalendarDays, Crown, Infinity as InfinityIcon, Medal, Star } from "lucide-react";
 import { Notice, Page, Tabs } from "@/components/ui";
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
+import { WithPinRail } from "@/components/PinRail";
 
 const MILESTONE_TONES: Tone[] = ["emerald", "sky", "violet", "amber", "rose", "teal", "orange", "indigo"];
 const RANK_TONES: Tone[] = ["amber", "slate", "orange"];
@@ -79,8 +80,9 @@ export default function LeaderboardPage() {
       .catch((e) => setError(e.message));
   }, [period]);
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
+      <WithPinRail>
       <Page>
         <h1 className="text-3xl font-semibold tracking-tight mb-1">Leaderboard</h1>
         <p className="text-secondary text-sm mb-6">Only verified records count. Score = 5 × verified records + upvotes received.</p>
@@ -116,6 +118,7 @@ export default function LeaderboardPage() {
           )}
         </div>
       </Page>
+      </WithPinRail>
     </div>
   );
 }

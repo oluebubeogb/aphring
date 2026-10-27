@@ -19,6 +19,8 @@ import exploreRoutes from "./routes/explore.js";
 import feedRoutes from "./routes/feed.js";
 import meRoutes from "./routes/me.js";
 import communityRoutes from "./routes/community.js";
+import { pinsPublicRouter, pinsAdminRouter, recordPinAnalytics } from "./routes/pins.js";
+import { requireAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { ensureStorage } from "./services/storage.js";
 
@@ -47,9 +49,14 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/chats", chatRoutes);
+// Owner/admin analytics for a pinned record (before the knowledge router so /:id doesn't swallow it).
+app.get("/api/knowledge/:id/pin-analytics", requireAuth, recordPinAnalytics);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/documents", documentRoutes);
+// Pins (admin-only) mounted before the general workstation router (which allows moderators).
+app.use("/api/workstation/pins", pinsAdminRouter);
 app.use("/api/workstation", workstationRoutes);
+app.use("/api/pins", pinsPublicRouter);
 app.use("/api/votes", voteRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/oral", oralRoutes);

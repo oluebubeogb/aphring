@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X } from "lucide-react";
+import { Activity, AlertTriangle, ClipboardCheck, FileText, LayoutDashboard, Network, PenLine, Pin, Plus, Users, X } from "lucide-react";
+import PinsTab from "@/components/workstation/PinsTab";
 import Header, { useSession } from "@/components/Header";
 import { api, downloadFile, ENTITY_TYPES, isLoggedIn, isStaff, KNOWLEDGE_TYPES, timeAgo } from "@/lib/api";
-import { btnGhost, btnPrimary, inputCls, Notice, Page, StatusPill, Tabs, textareaCls } from "@/components/ui";
+import { btnGhost, btnPrimary, inputCls, Notice, Page, PageTitle, StatusPill, Tabs, textareaCls } from "@/components/ui";
+import type { Tone } from "@/components/Colorful";
+import type { LucideIcon } from "lucide-react";
 
-type Tab = "queue" | "documents" | "corrections" | "reports" | "entities" | "people" | "ops";
+type Tab = "queue" | "documents" | "corrections" | "reports" | "entities" | "people" | "ops" | "pins";
 type EntityDraft = { name: string; type: string; reason?: string; existingId?: string };
 
 interface StaffRecord {
@@ -1024,7 +1027,7 @@ export default function WorkstationPage() {
   if (!ready) return null;
   if (!isStaff(user)) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <Header />
         <Page>
           <Notice>The workstation is for moderators and admins.</Notice>
@@ -1033,21 +1036,26 @@ export default function WorkstationPage() {
     );
   }
   const admin = user!.role === "ADMIN";
-  const tabs: { value: Tab; label: string; badge?: number }[] = [
-    { value: "queue", label: "Review queue", badge: stats?.pending },
-    { value: "documents", label: "Documents" },
-    { value: "corrections", label: "Corrections", badge: stats?.corrections },
-    { value: "reports", label: "Reports", badge: stats?.reports },
-    { value: "entities", label: "Entities" },
+  const tabs: { value: Tab; label: string; badge?: number; icon: LucideIcon; tone: Tone }[] = [
+    { value: "queue", label: "Review queue", badge: stats?.pending, icon: ClipboardCheck, tone: "emerald" },
+    { value: "documents", label: "Documents", icon: FileText, tone: "sky" },
+    { value: "corrections", label: "Corrections", badge: stats?.corrections, icon: PenLine, tone: "amber" },
+    { value: "reports", label: "Reports", badge: stats?.reports, icon: AlertTriangle, tone: "orange" },
+    { value: "entities", label: "Entities", icon: Network, tone: "violet" },
   ];
-  if (admin) tabs.push({ value: "people", label: "People" }, { value: "ops", label: "Ops" });
+  if (admin)
+    tabs.push(
+      { value: "pins", label: "Pins", icon: Pin, tone: "rose" },
+      { value: "people", label: "People", icon: Users, tone: "teal" },
+      { value: "ops", label: "Ops", icon: Activity, tone: "slate" }
+    );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
       <Page wide>
-        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-          <h1 className="text-3xl font-semibold tracking-tight">Workstation</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <PageTitle icon={LayoutDashboard} tone="slate" title="Workstation" />
           {stats && (
             <p className="text-sm text-secondary">
               {stats.verified} verified · {stats.pending} pending · {stats.entities} entities · {stats.users} users · {stats.moderators} moderators
@@ -1076,6 +1084,7 @@ export default function WorkstationPage() {
           {tab === "entities" && <EntitiesTab flash={flash} admin={admin} />}
           {tab === "people" && admin && <PeopleTab flash={flash} />}
           {tab === "ops" && admin && <OpsTab flash={flash} />}
+          {tab === "pins" && admin && <PinsTab flash={flash} />}
         </div>
       </Page>
     </div>

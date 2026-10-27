@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, setSession, type SessionUser } from "@/lib/api";
-import { btnPrimary, inputCls, Notice } from "@/components/ui";
+import { AuthHeader, FieldLabel, btnPrimary, inputCls, Notice } from "@/components/ui";
+import { AtSign, Lock, Mail, User, UserPlus } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -33,22 +34,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-8">
-        <div className="text-center">
-          <Link href="/" className="text-2xl font-semibold tracking-tight">
-            aphring
-          </Link>
-          <p className="mt-2 text-secondary text-sm">Create your contributor account</p>
-        </div>
+        <AuthHeader icon={UserPlus} tone="emerald" subtitle="Create your contributor account" />
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <Notice kind="error">{error}</Notice>}
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Full name</label>
+            <FieldLabel icon={User} tone="teal" className="mb-1.5">Full name</FieldLabel>
             <input value={form.name} onChange={set("name")} required minLength={2} className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Username</label>
+            <FieldLabel icon={AtSign} tone="sky" className="mb-1.5">Username</FieldLabel>
             <input
               value={form.username}
               onChange={set("username")}
@@ -60,14 +56,15 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Email</label>
+            <FieldLabel icon={Mail} tone="amber" className="mb-1.5">Email</FieldLabel>
             <input type="email" value={form.email} onChange={set("email")} required className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Password</label>
+            <FieldLabel icon={Lock} tone="violet" className="mb-1.5">Password</FieldLabel>
             <input type="password" value={form.password} onChange={set("password")} required minLength={8} maxLength={200} autoComplete="new-password" className={inputCls} />
           </div>
           <button type="submit" disabled={loading} className={`${btnPrimary} w-full h-11`}>
+            <UserPlus className="w-4 h-4" />
             {loading ? "Creating…" : "Create account"}
           </button>
         </form>

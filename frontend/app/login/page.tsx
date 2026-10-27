@@ -4,7 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, setSession, type SessionUser } from "@/lib/api";
-import { btnPrimary, inputCls, Notice } from "@/components/ui";
+import { AuthHeader, FieldLabel, btnPrimary, inputCls, Notice } from "@/components/ui";
+import { AtSign, Lock, LogIn } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -34,23 +35,18 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-8">
-        <div className="text-center">
-          <Link href="/" className="text-2xl font-semibold tracking-tight">
-            aphring
-          </Link>
-          <p className="mt-2 text-secondary text-sm">Sign in with your username or email</p>
-        </div>
+        <AuthHeader icon={LogIn} tone="blue" subtitle="Sign in with your username or email" />
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <Notice kind="error">{error}</Notice>}
           <div>
-            <label className="block text-sm text-secondary mb-1.5">Username or email</label>
+            <FieldLabel icon={AtSign} tone="sky" className="mb-1.5">Username or email</FieldLabel>
             <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} required autoComplete="username" className={inputCls} />
           </div>
           <div>
             <div className="flex items-baseline justify-between mb-1.5">
-              <label className="block text-sm text-secondary">Password</label>
+              <FieldLabel icon={Lock} tone="violet">Password</FieldLabel>
               <Link href="/forgot-password" className="text-xs text-secondary hover:text-primary underline underline-offset-2">
                 Forgot password?
               </Link>
@@ -58,6 +54,7 @@ function LoginForm() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className={inputCls} />
           </div>
           <button type="submit" disabled={loading} className={`${btnPrimary} w-full h-11`}>
+            <LogIn className="w-4 h-4" />
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
