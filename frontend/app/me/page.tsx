@@ -141,8 +141,8 @@ export default function MePage() {
                 value={tab}
                 onChange={setTab}
                 tabs={[
-                  { value: "submissions", label: "My submissions" },
-                  { value: "saved", label: "Saved", badge: saves.length },
+                  { value: "submissions", label: "My submissions", icon: SECTION_ICONS.submissions, tone: "gray" },
+                  { value: "saved", label: "Saved", badge: saves.length, icon: SECTION_ICONS.saved, tone: "gray" },
                 ]}
               />
               {tab === "submissions" ? (

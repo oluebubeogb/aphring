@@ -1,4 +1,4 @@
-import { Award, BadgeCheck, Flag, History, CheckCircle2, ClipboardCheck, FileText, FolderOpen, PencilLine, ThumbsUp, type LucideIcon } from "lucide-react";
+import { Award, BadgeCheck, Bookmark, Flag, History, CheckCircle2, ClipboardCheck, FileText, FolderOpen, Inbox, PencilLine, ThumbsUp, type LucideIcon } from "lucide-react";
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
 
 /** Colour + icon per milestone ladder / stat (keys match the backend's badge ladders). */
@@ -80,7 +80,8 @@ export function BadgeList({ badges }: { badges: Badge[] }) {
         <span
           key={b.id}
           title={b.description}
-          className={`group inline-flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full border text-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-sm ${TONES[badgeTone(b.id)].soft}`}
+          tabIndex={0}
+          className={`calm-until-hover group inline-flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full border text-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-sm ${TONES[badgeTone(b.id)].soft}`}
         >
           <IconBubble icon={Award} tone={badgeTone(b.id)} size="xs" className="transition-transform duration-300 group-hover:rotate-12" /> {b.name}
         </span>
@@ -126,4 +127,4 @@ export function SectionHeading({ icon, children }: { icon: LucideIcon; children:
   );
 }
 
-export const SECTION_ICONS = { badges: BadgeCheck, milestones: Flag, recent: History, work: CheckCircle2 } as const;
+export const SECTION_ICONS = { badges: BadgeCheck, milestones: Flag, recent: History, work: CheckCircle2, submissions: Inbox, saved: Bookmark } as const;
