@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { api } from "@/lib/api";
-import { CalendarDays, Crown, Infinity as InfinityIcon, Medal, Star } from "lucide-react";
-import { Notice, Page, Tabs } from "@/components/ui";
+import { CalendarDays, Crown, Infinity as InfinityIcon, Medal, Star, Trophy } from "lucide-react";
+import { Notice, Page, PageTitle, Tabs } from "@/components/ui";
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
 import { WithPinRail } from "@/components/PinRail";
 
@@ -84,8 +84,9 @@ export default function LeaderboardPage() {
       <Header />
       <WithPinRail>
       <Page fill>
-        <h1 className="text-3xl font-semibold tracking-tight mb-1">Leaderboard</h1>
-        <p className="text-secondary text-sm mb-6">Only verified records count. Score = 5 × verified records + upvotes received.</p>
+        <div className="mb-6">
+          <PageTitle icon={Trophy} tone="amber" title="Leaderboard" />
+        </div>
         <Tabs
           value={period}
           onChange={setPeriod}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, FileText, Upload } from "lucide-react";
+import { CheckCircle, FileText, Mic, Upload } from "lucide-react";
 import { WithPinRail } from "@/components/PinRail";
 import Header from "@/components/Header";
 import { api, isLoggedIn, KNOWLEDGE_TYPES } from "@/lib/api";
@@ -53,6 +53,11 @@ function PlaceAndType({
 export default function SubmitPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"file" | "write">("file");
+  // /submit?tab=write (used by the Oral history page's tabs) opens the matching tab.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "write" || t === "file") setTab(t);
+  }, []);
   const [place, setPlace] = useState("");
   const [type, setType] = useState("history");
   const [dragging, setDragging] = useState(false);
@@ -119,19 +124,16 @@ export default function SubmitPage() {
       <Header />
       <WithPinRail>
       <Page fill>
-        <div className="mb-3">
+        <div className="mb-6">
           <PageTitle icon={Sparkles} tone="orange" title="Contribute knowledge" />
         </div>
-        <p className="text-secondary mb-6">
-          Everything you send is reviewed by a moderator before it becomes public, searchable and counted toward your badges.
-          For recordings use <Link href="/oral" className="underline">Oral history</Link>.
-        </p>
-        <Tabs
+        <Tabs<"file" | "write" | "oral">
           value={tab}
-          onChange={setTab}
+          onChange={(v) => (v === "oral" ? router.push("/oral") : setTab(v))}
           tabs={[
             { value: "file", label: "Upload a file", icon: Upload, tone: "sky" },
             { value: "write", label: "Write a record", icon: PenLine, tone: "amber" },
+            { value: "oral", label: "Oral history", icon: Mic, tone: "fuchsia" },
           ]}
         />
         <div className="mt-6 space-y-6">

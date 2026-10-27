@@ -3,11 +3,12 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, MessageSquare, Send, Menu, X, Compass, Copy, Check, ThumbsUp, ThumbsDown, Rss, User, LayoutDashboard, Moon, Sun, LogOut, Sparkles, LogIn } from "lucide-react";
+import { Plus, MessageSquare, Send, Menu, X, Compass, Copy, Check, ThumbsUp, ThumbsDown, Rss, User, LayoutDashboard, Moon, Sun, LogOut, Sparkles, LogIn, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { IconBubble, TONES } from "@/components/Colorful";
 import EmptyContribute from "@/components/EmptyContribute";
 import { api, isLoggedIn, clearToken, isStaff, getStoredUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
+import { BrandMark } from "@/components/ui";
 import SourceOverlay, { type SourceRef } from "@/components/SourceOverlay";
 
 interface Chat {
@@ -43,6 +44,7 @@ interface JobResponse {
 }
 
 const POLL_MS = 1500;
+const SIDEBAR_KEY = "aphring-chat-sidebar-collapsed";
 const POLL_MAX_MS = 3 * 60 * 1000;
 
 /** Ask answers in the background (RunPod can take 1–2 min); poll the job until it finishes. */
@@ -102,6 +104,19 @@ export default function ChatView({ chatId }: { chatId?: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Desktop: chat-history sidebar can be collapsed; remembered in localStorage.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "1");
+    } catch {}
+  }, []);
+  const toggleCollapsed = (v: boolean) => {
+    setCollapsed(v);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, v ? "1" : "0");
+    } catch {}
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialQ = searchParams.get("q");
   const startedRef = useRef(false);
@@ -324,18 +339,27 @@ export default function ChatView({ chatId }: { chatId?: string }) {
       <aside
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 fixed md:static z-30 w-64 h-full border-r border-border bg-surface flex flex-col transition-transform`}
+        } md:translate-x-0 ${collapsed ? "md:hidden" : ""} fixed md:static z-30 w-64 shrink-0 h-full border-r border-border bg-surface flex flex-col transition-transform`}
       >
         <div className="p-4 flex items-center justify-between border-b border-border">
           <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
-            <span className="brand-mark" aria-hidden="true" />
+            <BrandMark />
             <span className="text-primary">aphring</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
             className="md:hidden text-secondary"
+            aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => toggleCollapsed(true)}
+            className="hidden md:inline-flex group text-secondary hover:text-primary"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+          >
+            <IconBubble icon={PanelLeftClose} tone="slate" size="sm" className="nav-bubble transition-transform duration-200 group-hover:scale-110" />
           </button>
         </div>
 
@@ -419,16 +443,29 @@ export default function ChatView({ chatId }: { chatId?: string }) {
         <header className="h-14 border-b border-border flex items-center px-4 gap-3">
           {guest ? (
             <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
-              <span className="brand-mark" aria-hidden="true" />
+              <BrandMark />
               <span className="text-primary">aphring</span>
             </Link>
           ) : (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden text-secondary"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden text-secondary"
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              {collapsed && (
+                <button
+                  onClick={() => toggleCollapsed(false)}
+                  className="hidden md:inline-flex group text-secondary hover:text-primary"
+                  title="Show chats"
+                  aria-label="Show chats sidebar"
+                >
+                  <IconBubble icon={PanelLeftOpen} tone="violet" size="sm" className="nav-bubble transition-transform duration-200 group-hover:scale-110" />
+                </button>
+              )}
+            </>
           )}
           <span className="text-sm text-secondary truncate flex-1">
             {guest ? "Ask as a guest" : activeChat

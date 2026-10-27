@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Compass, Search, Upload, Mic, Trophy, Rss, ArrowRight } from "lucide-react";
 import Header from "@/components/Header";
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
+import { WithPinRail } from "@/components/PinRail";
 
 /** Example questions that slowly rotate in the search box until the visitor starts typing. */
 const EXAMPLES = [
@@ -64,7 +65,9 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="relative flex-1 flex flex-col items-center justify-center px-6 py-20 overflow-hidden">
+      <div className="flex-1 w-full">
+      <WithPinRail>
+      <main className="relative w-full min-h-[calc(100vh-11rem)] flex flex-col items-center justify-center py-16 sm:py-20">
         <div className="max-w-3xl w-full text-center space-y-8">
           <div className="space-y-3 animate-fade-up">
             <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-primary">
@@ -128,6 +131,8 @@ export default function LandingPage() {
           </div>
         </div>
       </main>
+      </WithPinRail>
+      </div>
       <footer className="border-t border-border py-6 text-center text-sm text-secondary">aphring · Community-powered knowledge for Nigeria</footer>
     </div>
   );

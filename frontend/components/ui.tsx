@@ -164,13 +164,19 @@ export function PageTitle({ icon, tone, title, subtitle }: { icon: LucideIcon; t
   );
 }
 
+/** Aphring pyramid mark (public/aphring-mark.png) shown beside the wordmark. */
+export function BrandMark({ className = "h-7 w-7" }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/aphring-mark.png" alt="" aria-hidden="true" width={28} height={28} className={`brand-mark ${className}`} />;
+}
+
 /** Brand + icon header used on login / register / password pages. */
 export function AuthHeader({ icon, tone, subtitle }: { icon: LucideIcon; tone: Tone; subtitle: React.ReactNode }) {
   return (
     <div className="text-center flex flex-col items-center gap-3 animate-fade-up">
       <IconBubble icon={icon} tone={tone} size="lg" className="animate-float-soft" />
       <Link href="/" className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight text-primary">
-        <span className="brand-mark" aria-hidden="true" />
+        <BrandMark />
         aphring
       </Link>
       <p className="text-secondary text-sm">{subtitle}</p>

@@ -171,15 +171,12 @@ body::before {
   }
 
   /* Brand mark: three overlapping dots in the Aphring palette. */
+  /* Aphring pyramid mark beside the wordmark. */
   .brand-mark {
-    @apply relative inline-block h-5 w-5 rounded-full bg-gradient-to-br from-emerald-400 via-sky-400 to-violet-500 shadow-sm transition-transform duration-500;
-  }
-  .brand-mark::after {
-    content: "";
-    @apply absolute inset-[5px] rounded-full bg-background;
+    @apply inline-block shrink-0 object-contain select-none transition-transform duration-500;
   }
   a:hover > .brand-mark {
-    transform: rotate(180deg) scale(1.08);
+    transform: translateY(-1px) scale(1.08);
   }
 
   .card-lift {

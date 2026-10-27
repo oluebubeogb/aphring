@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Header, { useSession } from "@/components/Header";
 import RecordCard, { type PublicRecord } from "@/components/RecordCard";
 import { api } from "@/lib/api";
-import { Clock, Sparkles, TrendingUp, type LucideIcon } from "lucide-react";
-import { btnGhost, Notice, Page, Tabs } from "@/components/ui";
+import { Clock, Rss, Sparkles, TrendingUp, type LucideIcon } from "lucide-react";
+import { btnGhost, Notice, Page, PageTitle, Tabs } from "@/components/ui";
 import EmptyContribute from "@/components/EmptyContribute";
 import type { Tone } from "@/components/Colorful";
 import { WithPinRail } from "@/components/PinRail";
@@ -48,8 +48,9 @@ export default function FeedPage() {
       <Header />
       <WithPinRail>
       <Page fill>
-        <h1 className="text-3xl font-semibold tracking-tight mb-1">Feed</h1>
-        <p className="text-secondary text-sm mb-6">Verified records. Vote, save, share or propose a correction.</p>
+        <div className="mb-6">
+          <PageTitle icon={Rss} tone="sky" title="Feed" />
+        </div>
         <Tabs tabs={tabs} value={tab} onChange={setTab} />
         <div className="space-y-3 mt-6">
           {note && <Notice>{note}</Notice>}

@@ -73,7 +73,7 @@ export default function ExplorePage() {
       <WithPinRail>
       <Page fill>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-          <PageTitle icon={Compass} tone="emerald" title="Explore" subtitle="Built from verified records only." />
+          <PageTitle icon={Compass} tone="emerald" title="Explore" />
           <form onSubmit={search} className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people, places, schools…" className={`${inputCls} pl-9`} />

@@ -7,7 +7,7 @@ import { Compass, LayoutDashboard, LogIn, LogOut, Menu, MessageSquare, Moon, Rss
 import { IconBubble, TONES, type Tone } from "@/components/Colorful";
 import { api, clearSession, getStoredUser, isLoggedIn, isStaff, storeUser, type SessionUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
-import { appShell } from "@/components/ui";
+import { appShell, BrandMark } from "@/components/ui";
 
 export function useSession() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -65,7 +65,7 @@ export default function Header() {
       <div className="h-px w-full bg-slate-300/40 dark:bg-white/5" aria-hidden="true" />
       <div className={`${appShell} h-14 flex items-center justify-between gap-4`}>
         <Link href="/" className="group inline-flex items-center gap-2 font-semibold text-lg tracking-tight">
-          <span className="brand-mark" aria-hidden="true" />
+          <BrandMark />
           <span className="text-primary">
             aphring
           </span>

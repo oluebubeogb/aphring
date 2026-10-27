@@ -9,6 +9,8 @@ import { BadgeList, MilestoneList, StatsGrid, type Badge, type Milestone, type S
 import { api, isLoggedIn, storeUser, timeAgo } from "@/lib/api";
 import { btnGhost, btnPrimary, Notice, Page, StatusPill, Tabs } from "@/components/ui";
 import { WithPinRail } from "@/components/PinRail";
+import { IconBubble } from "@/components/Colorful";
+import { CircleUser } from "lucide-react";
 
 interface Profile {
   user: { id: string; username: string; name: string; email: string; role: "USER" | "MODERATOR" | "ADMIN"; reputation: number; createdAt: string };
@@ -88,7 +90,9 @@ export default function MePage() {
         {msg && <Notice kind="ok">{msg}</Notice>}
         {p && (
           <div className="space-y-8 mt-2">
-            <div>
+            <div className="flex items-start gap-3">
+              <IconBubble icon={CircleUser} tone="gray" size="lg" className="hover-pop shrink-0" />
+              <div className="min-w-0">
               <h1 className="text-3xl font-semibold tracking-tight">{p.user.name}</h1>
               <p className="text-secondary text-sm">
                 @{p.user.username} · {p.user.role.toLowerCase()} · reputation {p.user.reputation} · joined {timeAgo(p.user.createdAt)} ·{" "}
@@ -96,6 +100,7 @@ export default function MePage() {
                   public profile
                 </Link>
               </p>
+              </div>
             </div>
 
             {invites.length > 0 && (

@@ -8,6 +8,8 @@ import { BadgeList, MilestoneList, StatsGrid, type Badge, type Milestone, type S
 import { api, timeAgo } from "@/lib/api";
 import { Notice, Page } from "@/components/ui";
 import { WithPinRail } from "@/components/PinRail";
+import { IconBubble } from "@/components/Colorful";
+import { CircleUser } from "lucide-react";
 
 interface PublicProfile {
   user: { username: string; name: string; reputation: number; createdAt: string };
@@ -34,11 +36,14 @@ export default function UserPage() {
         {error && <Notice>{error}</Notice>}
         {p && (
           <div className="space-y-8">
-            <div>
+            <div className="flex items-start gap-3">
+              <IconBubble icon={CircleUser} tone="gray" size="lg" className="hover-pop shrink-0" />
+              <div className="min-w-0">
               <h1 className="text-3xl font-semibold tracking-tight">{p.user.name}</h1>
               <p className="text-secondary text-sm">
                 @{p.user.username} · reputation {p.user.reputation} · joined {timeAgo(p.user.createdAt)}
               </p>
+              </div>
             </div>
             <StatsGrid stats={p.stats} />
             <section className="space-y-3">
